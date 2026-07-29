@@ -9,6 +9,10 @@ using namespace rrtmgp;
 int main() {
     std::cout << "Running test_cloud_optics..." << std::endl;
 
+    const size_t gpoints = 2;
+    const size_t layers = 2;
+    const size_t columns = 1;
+
     // Create base optical props
     std::vector<int> gpoint_to_band_data = {0, 1}; // 2 gpoints, 2 bands
     std::vector<int> band_lims_data = {0, 1,
@@ -20,25 +24,54 @@ int main() {
     OpticalProps props(gpoint_to_band_view, band_lims_view);
 
     // Mock LUT tables
-    std::vector<real_t> lut_liquid_data(2 * 2 * 2, 1.0); // gpoints x radius_sizes x parameter
-    std::vector<real_t> lut_ice_data(2 * 2 * 2, 2.0);
+    // Liquid LUT: parameter 0 is extinction (e.g. 5.0 for r_idx=0, 3.0 for r_idx=1), parameter 1 is ssa (e.g. 0.95 for both)
+    std::vector<real_t> lut_liquid_data = {
+        5.0, 0.95, // gp0, r_idx=0
+        3.0, 0.95, // gp0, r_idx=1
+        5.0, 0.95, // gp1, r_idx=0
+        3.0, 0.95  // gp1, r_idx=1
+    };
+    std::vector<real_t> lut_ice_data(2 * 2 * 2, 2.0); // Ice LUT flat 2.0 for everything
 
     auto lut_liq_view = ConstView3D(lut_liquid_data.data(), Extents3D(2, 2, 2));
     auto lut_ice_view = ConstView3D(lut_ice_data.data(), Extents3D(2, 2, 2));
 
     try {
-        // TDD RED Phase: Expected to fail at runtime with runtime_error since constructor throws
         CloudOptics optics(props, lut_liq_view, lut_ice_view);
 
-        std::cerr << "test_cloud_optics FAIL: Constructor did not throw runtime_error!" << std::endl;
-        return 1;
-    } catch (const std::runtime_error& e) {
-        std::cout << "T009 RED: Successfully caught expected runtime_error for CloudOptics: " << e.what() << std::endl;
+        // Inputs for cloud calculation
+        std::vector<real_t> clwp_data = {0.2, 0.2}; // Liquid water path for 2 layers
+        std::vector<real_t> ciwp_data = {0.0, 0.0}; // No ice clouds
+        std::vector<real_t> rel_data = {8.0, 8.0};   // Liquid radius = 8 (uses r_idx = 0)
+        std::vector<real_t> rei_data = {0.0, 0.0};
+
+        auto clwp_view = ConstView2D(clwp_data.data(), Extents2D(layers, columns));
+        auto ciwp_view = ConstView2D(ciwp_data.data(), Extents2D(layers, columns));
+        auto rel_view = ConstView2D(rel_data.data(), Extents2D(layers, columns));
+        auto rei_view = ConstView2D(rei_data.data(), Extents2D(layers, columns));
+
+        // Outputs
+        std::vector<real_t> tau_data(gpoints * layers * columns, 0.0);
+        std::vector<real_t> ssa_data(gpoints * layers * columns, 0.0);
+        std::vector<real_t> g_data(gpoints * layers * columns, 0.0);
+
+        auto tau_view = View3D(tau_data.data(), Extents3D(gpoints, layers, columns));
+        auto ssa_view = View3D(ssa_data.data(), Extents3D(gpoints, layers, columns));
+        auto g_view = View3D(g_data.data(), Extents3D(gpoints, layers, columns));
+
+        optics.compute_cloud_optics(clwp_view, ciwp_view, rel_view, rei_view, tau_view, ssa_view, g_view);
+
+        // Expected optical depth tau = clwp * lut_liquid(gp, r_idx=0, parameter_ext=0) = 0.2 * 5.0 = 1.0
+        std::cout << "Computed liquid tau: " << tau_view(0, 0, 0) << std::endl;
+        if (std::abs(tau_view(0, 0, 0) - 1.0) >= 1e-10) {
+            std::cerr << "test_cloud_optics FAIL: Mismatched liquid cloud optical depth!" << std::endl;
+            return 1;
+        }
+
+        std::cout << "test_cloud_optics: SUCCESS (GREEN phase verified)" << std::endl;
+        return 0;
     } catch (const std::exception& e) {
-        std::cerr << "test_cloud_optics FAIL with unexpected exception: " << e.what() << std::endl;
+        std::cerr << "test_cloud_optics FAIL with exception: " << e.what() << std::endl;
         return 1;
     }
-
-    std::cout << "test_cloud_optics: SUCCESS (RED phase verified)" << std::endl;
-    return 0;
 }
