@@ -76,4 +76,28 @@ void reduce_byband(
     }
 }
 
+void zenith_angle_spherical_correction(
+    ConstView1D solar_zenith_angle,
+    ConstView2D pressure_layers,
+    View1D corrected_zenith_angle
+) {
+    (void)solar_zenith_angle;
+    (void)pressure_layers;
+    (void)corrected_zenith_angle;
+    throw std::runtime_error("zenith_angle_spherical_correction is not implemented yet");
+}
+
+void execute_mcica_sampling(
+    ConstView2D cloud_fraction,
+    size_t sub_columns_cnt,
+    IntView2D output_column_mask,
+    unsigned int random_seed
+) {
+    (void)cloud_fraction;
+    (void)sub_columns_cnt;
+    (void)output_column_mask;
+    (void)random_seed;
+    throw std::runtime_error("execute_mcica_sampling is not implemented yet");
+}
+
 } // namespace rte::extensions

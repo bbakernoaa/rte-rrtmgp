@@ -48,7 +48,20 @@ add_rrtmgp_test(test_kernel_interpolation)
 add_rrtmgp_test(test_kernel_absorption)
 add_rrtmgp_test(test_kernel_optics_thermal)
 add_rrtmgp_test(test_gas_concentrations)
+add_rrtmgp_test(test_zenith_spherical)
+add_rrtmgp_test(test_cloud_sampling)
 
 # Validation runner executable
 add_executable(val_runner tests/val_runner.cpp)
 target_link_libraries(val_runner PRIVATE rrtmgp_cpp)
+
+# Locate NetCDF library and headers portably (supporting macOS Homebrew and standard Linux)
+find_path(NETCDF_INC netcdf.h PATHS /opt/homebrew/include /usr/local/include /usr/include)
+find_library(NETCDF_LIB netcdf PATHS /opt/homebrew/lib /usr/local/lib /usr/lib)
+
+# End-to-End All-Sky Simulation Driver linked privately to NetCDF
+add_executable(cpp_allsky tests/cpp_allsky.cpp)
+target_include_directories(cpp_allsky PRIVATE ${NETCDF_INC})
+target_link_libraries(cpp_allsky PRIVATE rrtmgp_cpp ${NETCDF_LIB})
+
+

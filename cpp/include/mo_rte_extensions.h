@@ -26,4 +26,19 @@ void reduce_byband(
     View2D band_flux
 );
 
+// Computes spherical atmosphere zenith angle corrections for shallow solar angles near twilight
+void zenith_angle_spherical_correction(
+    ConstView1D solar_zenith_angle, // Input angles (columns)
+    ConstView2D pressure_layers,    // Pressure grid (layers, columns) Pa
+    View1D corrected_zenith_angle   // Output cosine zenith angles (columns)
+);
+
+// Mapped Monte Carlo cloud overlap sampling (MCICA sub-column mapping)
+void execute_mcica_sampling(
+    ConstView2D cloud_fraction,      // 2D cloud layers (layers, columns)
+    size_t sub_columns_cnt,
+    IntView2D output_column_mask,     // Output mask (layers, columns * sub_columns_cnt)
+    unsigned int random_seed = 12345  // Configurable seed for re-entrancy
+);
+
 } // namespace rte::extensions
