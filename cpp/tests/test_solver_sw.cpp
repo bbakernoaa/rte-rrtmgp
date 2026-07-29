@@ -19,9 +19,9 @@ int main() {
     // ----------------------------------------------------
     std::cout << "Executing Non-Scattering Beam Attenuation Test..." << std::endl;
 
-    // Inputs: layers = 2, columns = 1, gpoints = 2
-    std::vector<real_t> tau_data = {0.5, 0.5,  // gp 0, lay 0-1
-                                    0.2, 0.2}; // gp 1, lay 0-1
+    // Inputs: layers = 2, columns = 1, gpoints = 2 (column-major)
+    std::vector<real_t> tau_data = {0.5, 0.5,  // gp 0-1, lay 0
+                                    0.2, 0.2}; // gp 0-1, lay 1
     std::vector<real_t> sza_data = {0.8};      // mu0 = cos(zenith_angle) = 0.8
     std::vector<real_t> toa_data = {100.0, 100.0}; // TOA incoming solar flux for 2 gpoints
 
@@ -34,18 +34,22 @@ int main() {
     auto flux_dir_view = View2D(flux_dir_data.data(), Extents2D(gpoints, columns));
 
     try {
-        // TDD RED Phase: Expected to throw a runtime_error since solve_sw_noscat is unimplemented
         SolverSw::solve_sw_noscat(tau_view, sza_view, toa_view, flux_dir_view);
 
-        // Assertions for green phase
-        real_t expected_dir_gp0 = 100.0 * 0.8 * std::exp(-(0.5 + 0.5) / 0.8);
+        // For gp=0, lay=0 has tau=0.5, lay=1 has tau=0.2. Total tau = 0.7.
+        real_t expected_dir_gp0 = 100.0 * 0.8 * std::exp(-(0.5 + 0.2) / 0.8);
+        
+        std::cout << "Actual flux_dir: " << std::setprecision(10) << flux_dir_view(0, 0) << std::endl;
+        std::cout << "Expected flux_dir: " << std::setprecision(10) << expected_dir_gp0 << std::endl;
+
         if (std::abs(flux_dir_view(0, 0) - expected_dir_gp0) >= 1e-5) {
             std::cerr << "test_solver_sw FAIL: Mismatched non-scattering flux values" << std::endl;
             return 1;
         }
 
-    } catch (const std::runtime_error& e) {
-        std::cout << "T004 RED: Successfully caught expected runtime_error for solve_sw_noscat: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "test_solver_sw FAIL with unexpected exception: " << e.what() << std::endl;
+        return 1;
     }
 
     // ----------------------------------------------------
@@ -53,8 +57,10 @@ int main() {
     // ----------------------------------------------------
     std::cout << "Executing Standalone Scattering Solvers Test..." << std::endl;
 
-    std::vector<real_t> ssa_data(gpoints * layers * columns, 0.8); // single scattering albedo = 0.8
-    std::vector<real_t> g_data(gpoints * layers * columns, 0.5);   // asymmetry factor = 0.5
+    std::vector<real_t> ssa_data = {0.8, 0.8,  // gp 0-1, lay 0
+                                    0.8, 0.8}; // gp 0-1, lay 1
+    std::vector<real_t> g_data = {0.5, 0.5,    // gp 0-1, lay 0
+                                  0.5, 0.5};   // gp 0-1, lay 1
     std::vector<real_t> sfc_albedo_data = {0.1, 0.1};              // surface albedo = 0.1
 
     auto ssa_view = ConstView3D(ssa_data.data(), Extents3D(gpoints, layers, columns));
@@ -69,11 +75,13 @@ int main() {
     auto flux_dn_view = View2D(flux_dn_data.data(), Extents2D(gpoints, columns));
 
     try {
-        // TDD RED Phase: Expected to throw a runtime_error since solve_sw_2stream is unimplemented
         SolverSw::solve_sw_2stream(
             tau_view, ssa_view, g_view, sza_view, sfc_albedo_view, toa_view,
             flux_up_view, flux_dn_view, flux_dir_view
         );
+
+        std::cout << "Actual flux_dn: " << flux_dn_view(0, 0) << std::endl;
+        std::cout << "Actual flux_up: " << flux_up_view(0, 0) << std::endl;
 
         // Verification checks (for green phase)
         if (flux_up_view(0, 0) <= 0.0 || flux_dn_view(0, 0) <= 0.0) {
@@ -81,10 +89,11 @@ int main() {
             return 1;
         }
 
-    } catch (const std::runtime_error& e) {
-        std::cout << "T005 RED: Successfully caught expected runtime_error for solve_sw_2stream: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "test_solver_sw FAIL with unexpected exception: " << e.what() << std::endl;
+        return 1;
     }
 
-    std::cout << "test_solver_sw: SUCCESS (RED phase verified for T004 & T005)" << std::endl;
+    std::cout << "test_solver_sw: SUCCESS (GREEN phase verified for T004 & T005)" << std::endl;
     return 0;
 }
