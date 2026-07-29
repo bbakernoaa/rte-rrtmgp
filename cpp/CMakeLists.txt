@@ -4,6 +4,13 @@ project(rrtmgp_cpp LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(ENABLE_KOKKOS "Enable Kokkos high-performance megakernel" OFF)
+
+if(ENABLE_KOKKOS)
+    find_package(Kokkos REQUIRED)
+    add_compile_definitions(ENABLE_KOKKOS)
+endif()
+
 # Compile options for robustness and performance
 if(MSVC)
     add_compile_options(/W4 /WX /O2)
@@ -22,6 +29,11 @@ add_library(rrtmgp_cpp
     src/mo_rte_extensions.cpp
     src/mo_rte_sw.cpp
 )
+
+if(ENABLE_KOKKOS)
+    target_sources(rrtmgp_cpp PRIVATE src/mo_kokkos_megakernel.cpp)
+    target_link_libraries(rrtmgp_cpp PUBLIC Kokkos::kokkos)
+endif()
 
 target_include_directories(rrtmgp_cpp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -50,6 +62,10 @@ add_rrtmgp_test(test_kernel_optics_thermal)
 add_rrtmgp_test(test_gas_concentrations)
 add_rrtmgp_test(test_zenith_spherical)
 add_rrtmgp_test(test_cloud_sampling)
+
+if(ENABLE_KOKKOS)
+    add_rrtmgp_test(test_kokkos_megakernel)
+endif()
 
 # Validation runner executable
 add_executable(val_runner tests/val_runner.cpp)
