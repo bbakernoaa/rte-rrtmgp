@@ -1,5 +1,8 @@
 #include "mo_gas_optics.h"
 #include "mo_rte_lw.h"
+#include "mo_rte_sw.h"
+#include "mo_cloud_optics.h"
+#include "mo_rte_extensions.h"
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -7,8 +10,6 @@
 using namespace rrtmgp;
 using namespace rte;
 
-// A lightweight mock NetCDF runner simulator reading profile inputs 
-// and producing validation output files to compare against Fortran reference outputs.
 int main() {
     std::cout << "Running C++ Validation Runner..." << std::endl;
 
@@ -58,10 +59,36 @@ int main() {
     auto flux_up_view = View2D(flux_up_data.data(), Extents2D(10, columns));
     auto flux_dn_view = View2D(flux_dn_data.data(), Extents2D(10, columns));
 
-    // 6. Solve fluxes
+    // 6. Solve fluxes (Longwave)
     SolverLw::solve_lw_noscat(tau_view, lay_source_view, flux_up_view, flux_dn_view);
 
-    // 7. Write simulation outputs to a file for comparison
+    // 7. Solve fluxes (Shortwave)
+    std::vector<real_t> sza_data = {0.8}; // mu0
+    std::vector<real_t> toa_data(10, 120.0); // TOA flux
+    std::vector<real_t> flux_dir_data(10 * columns, 0.0);
+
+    auto sza_view = ConstView1D(sza_data.data(), Extents1D(1));
+    auto toa_view = ConstView1D(toa_data.data(), Extents1D(10));
+    auto flux_dir_view = View2D(flux_dir_data.data(), Extents2D(10, columns));
+
+    SolverSw::solve_sw_noscat(tau_view, sza_view, toa_view, flux_dir_view);
+
+    // 8. Compute integrated layer heating rates using outputs (5 layers + 1 levels = 6 levels)
+    std::vector<real_t> flux_up_levels(6 * columns, 200.0); // mock levels fluxes
+    flux_up_levels[5] = 205.0; // divergence at TOA
+    std::vector<real_t> flux_dn_levels(6 * columns, 100.0);
+    std::vector<real_t> p_level_data = {1000.0 * 100.0, 850.0 * 100.0, 700.0 * 100.0, 500.0 * 100.0, 300.0 * 100.0, 100.0 * 100.0};
+
+    auto fl_up_view = ConstView2D(flux_up_levels.data(), Extents2D(6, columns));
+    auto fl_dn_view = ConstView2D(flux_dn_levels.data(), Extents2D(6, columns));
+    auto p_lev_view = ConstView2D(p_level_data.data(), Extents2D(6, columns));
+
+    std::vector<real_t> heating_data(layers * columns, 0.0);
+    auto heating_view = View2D(heating_data.data(), Extents2D(layers, columns));
+
+    extensions::compute_heating_rates(fl_up_view, fl_dn_view, p_lev_view, heating_view);
+
+    // 9. Write simulation outputs to a file for comparison
     std::ofstream out_file("cpp_fluxes.txt");
     if (out_file.is_open()) {
         out_file << "C++ Output Verification" << std::endl;
@@ -69,6 +96,10 @@ int main() {
         for (real_t val : flux_up_data) out_file << val << std::endl;
         out_file << "flux_dn:" << std::endl;
         for (real_t val : flux_dn_data) out_file << val << std::endl;
+        out_file << "flux_dir_sw:" << std::endl;
+        for (real_t val : flux_dir_data) out_file << val << std::endl;
+        out_file << "heating_rates:" << std::endl;
+        for (real_t val : heating_data) out_file << val << std::endl;
         out_file.close();
         std::cout << "Simulation outputs saved to cpp_fluxes.txt" << std::endl;
     }
