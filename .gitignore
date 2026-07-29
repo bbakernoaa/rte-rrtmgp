@@ -41,6 +41,13 @@ public
 
 # build
 build/
+build_cpp/
+cpp/build/
 
 # Ruby stuff
 **/Gemfile.lock
+
+specs/
+.gemini/
+.specs/
+.specify/
