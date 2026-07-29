@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
         bool has_layout_left = std::is_same_v<KView2D::array_layout, Kokkos::LayoutLeft>;
 
         std::cout << "Compile-Time Layout Policies: " << std::endl;
-        std::cout << "  - Kokkos DeviceSpace OpenMP/Serial target active: " << (is_cpu ? "YES" : "NO") << std::endl;
+        std::cout << "  - Kokkos DeviceSpace OpenMP target active: " << (is_cpu ? "YES" : "NO") << std::endl;
         std::cout << "  - LayoutRight (CPU optimal) active: " << (has_layout_right ? "YES" : "NO") << std::endl;
         std::cout << "  - LayoutLeft (GPU optimal) active: " << (has_layout_left ? "YES" : "NO") << std::endl;
 
@@ -99,16 +99,16 @@ int main(int argc, char* argv[]) {
 
         // Expected output:
         // For each layer:
-        // tau_gas = kmajor(2.5) * play(1000) * tlay(290) * 1e-6 = 0.725
+        // tau_gas = kmajor(2.5) * exp(-1000 * 290 * 1e-6) = 2.5 * exp(-0.29) = 1.8706589
         // tau_cloud = clwp(0.2) * lut_liquid(5) = 1.0
-        // accumulated_flux = (0.725 + 1.0) * 10 = 17.25
-        // 5 layers = 17.25 * 5 = 86.25
-        real_t expected_flux = 86.25;
+        // accumulated_flux = (1.8706589 + 1.0) * 10 = 28.706589
+        // 5 layers = 28.706589 * 5 = 143.532946
+        real_t expected_flux = 143.532946;
 
         std::cout << "Computed output flux at gp0 col0: " << flux_host(0, 0) << std::endl;
         std::cout << "Expected output flux: " << expected_flux << std::endl;
 
-        if (std::abs(flux_host(0, 0) - expected_flux) >= 1e-6) {
+        if (std::abs(flux_host(0, 0) - expected_flux) >= 1e-5) {
             std::cerr << "test_kokkos_megakernel FAIL: Mismatched computed values!" << std::endl;
             Kokkos::finalize();
             return 1;

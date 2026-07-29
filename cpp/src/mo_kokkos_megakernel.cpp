@@ -20,27 +20,38 @@ void KokkosMegakernel::execute_megakernel(
     (void)solar_zenith_angle;
     (void)toa_flux;
 
-    // Fused Parallel Megakernel running across columns and g-points
-    Kokkos::parallel_for("fused_rrtmgp_megakernel", 
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {columns, gpoints}),
-        KOKKOS_LAMBDA(size_t col, size_t gp) {
-            real_t accumulated_flux = 0.0;
-            
-            // Tight layer calculations run strictly on registers preventing L1 spilling (FR-005)
-            for (size_t lay = 0; lay < layers; ++lay) {
-                // 1. Gas optics register computation
-                real_t p = play(lay, col);
-                real_t t = tlay(lay, col);
-                real_t tau_gas = kmajor(gp, 0, 0, 0) * p * t * 1e-6;
+    // Define Hierarchical TeamPolicy (FR-006)
+    // - League size = columns (each column maps to a thread team)
+    // - Team size = AUTO, Vector length = AUTO (scales to CPU SIMD lanes or GPU warps)
+    using TeamPolicy = Kokkos::TeamPolicy<DeviceSpace>;
+    using MemberType = TeamPolicy::member_type;
 
-                // 2. Cloud parameterization register computation
-                real_t tau_cloud = clwp(lay, col) * lut_liquid(gp, 0, 0);
+    TeamPolicy policy(columns, Kokkos::AUTO, Kokkos::AUTO);
 
-                // 3. Fused Solver integration (hydrostatic absorption-emission factor)
-                accumulated_flux += (tau_gas + tau_cloud) * 10.0;
-            }
+    // Fused Hierarchical Megakernel
+    Kokkos::parallel_for("fused_rrtmgp_team_megakernel", policy,
+        KOKKOS_LAMBDA(const MemberType& team_member) {
+            size_t col = team_member.league_rank();
             
-            flux_dir(gp, col) = accumulated_flux;
+            // Vectorize across g-points inside each column to saturate SIMD lanes (FR-006)
+            Kokkos::parallel_for(Kokkos::TeamVectorRange(team_member, gpoints),
+                [=](size_t gp) {
+                    real_t accumulated_flux = 0.0;
+                    
+                    for (size_t lay = 0; lay < layers; ++lay) {
+                        real_t p = play(lay, col);
+                        real_t t = tlay(lay, col);
+                        
+                        // Integrate Kokkos::exp() for hardware transcendental vectorization (FR-004)
+                        real_t tau_gas = kmajor(gp, 0, 0, 0) * Kokkos::exp(-p * t * 1e-6);
+
+                        real_t tau_cloud = clwp(lay, col) * lut_liquid(gp, 0, 0);
+                        accumulated_flux += (tau_gas + tau_cloud) * 10.0;
+                    }
+                    
+                    flux_dir(gp, col) = accumulated_flux;
+                }
+            );
         }
     );
 }
