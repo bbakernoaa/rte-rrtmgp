@@ -81,6 +81,22 @@ int main(int argc, char* argv[]) {
         auto flux_host = Kokkos::create_mirror_view(flux_dir);
         Kokkos::deep_copy(flux_host, flux_dir);
 
+        // T007: Verify hardware-specific layout coalescing compile-time traits (FR-001)
+        bool is_cpu = std::is_same_v<DeviceSpace, Kokkos::OpenMP>;
+        bool has_layout_right = std::is_same_v<KView2D::array_layout, Kokkos::LayoutRight>;
+        bool has_layout_left = std::is_same_v<KView2D::array_layout, Kokkos::LayoutLeft>;
+
+        std::cout << "Compile-Time Layout Policies: " << std::endl;
+        std::cout << "  - Kokkos DeviceSpace OpenMP/Serial target active: " << (is_cpu ? "YES" : "NO") << std::endl;
+        std::cout << "  - LayoutRight (CPU optimal) active: " << (has_layout_right ? "YES" : "NO") << std::endl;
+        std::cout << "  - LayoutLeft (GPU optimal) active: " << (has_layout_left ? "YES" : "NO") << std::endl;
+
+        if (is_cpu && !has_layout_right) {
+            std::cerr << "T007 FAIL: CPU execution space must default to LayoutRight for AVX prefetching!" << std::endl;
+            Kokkos::finalize();
+            return 1;
+        }
+
         // Expected output:
         // For each layer:
         // tau_gas = kmajor(2.5) * play(1000) * tlay(290) * 1e-6 = 0.725
