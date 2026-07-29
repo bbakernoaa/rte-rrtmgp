@@ -2,6 +2,7 @@
 #include "mo_rte_util.h"
 #include <cmath>
 #include <stdexcept>
+#include <random>
 
 namespace rte::extensions {
 
@@ -102,14 +103,36 @@ void zenith_angle_spherical_correction(
 void execute_mcica_sampling(
     ConstView2D cloud_fraction,
     size_t sub_columns_cnt,
-    IntView2D output_column_mask,
+    IntViewMut2D output_column_mask,
     unsigned int random_seed
 ) {
-    (void)cloud_fraction;
-    (void)sub_columns_cnt;
-    (void)output_column_mask;
-    (void)random_seed;
-    throw std::runtime_error("execute_mcica_sampling is not implemented yet");
+    const size_t layers = cloud_fraction.extent(0);
+    const size_t columns = cloud_fraction.extent(1);
+
+    // Validate boundaries
+    validate_extent(output_column_mask, 0, layers, "output_column_mask");
+    validate_extent(output_column_mask, 1, columns * sub_columns_cnt, "output_column_mask");
+
+    // Initialize local seedable Mersenne Twister engine to guarantee 100% thread safety
+    std::mt19937 generator(random_seed);
+    std::uniform_real_distribution<real_t> distribution(0.0, 1.0);
+
+    // Perform Monte Carlo cloud sub-column overlap mappings
+    for (size_t col = 0; col < columns; ++col) {
+        for (size_t sub = 0; sub < sub_columns_cnt; ++sub) {
+            for (size_t lay = 0; lay < layers; ++lay) {
+                real_t c_frac = cloud_fraction(lay, col);
+                real_t r = distribution(generator);
+                
+                // If random draw is below layer cloud fraction, sub-column has a cloud
+                if (r <= c_frac) {
+                    output_column_mask(lay, col * sub_columns_cnt + sub) = 1; // cloud
+                } else {
+                    output_column_mask(lay, col * sub_columns_cnt + sub) = 0; // clear
+                }
+            }
+        }
+    }
 }
 
 } // namespace rte::extensions

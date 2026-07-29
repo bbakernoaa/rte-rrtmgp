@@ -37,7 +37,7 @@ void zenith_angle_spherical_correction(
 void execute_mcica_sampling(
     ConstView2D cloud_fraction,      // 2D cloud layers (layers, columns)
     size_t sub_columns_cnt,
-    IntView2D output_column_mask,     // Output mask (layers, columns * sub_columns_cnt)
+    IntViewMut2D output_column_mask,  // Output mask (layers, columns * sub_columns_cnt)
     unsigned int random_seed = 12345  // Configurable seed for re-entrancy
 );
 

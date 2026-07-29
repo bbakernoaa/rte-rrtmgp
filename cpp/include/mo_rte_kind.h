@@ -29,5 +29,6 @@ using ConstView4D = stdex::mdspan<const real_t, Extents4D, stdex::layout_left>;
 
 using IntView1D  = stdex::mdspan<const int, Extents1D, stdex::layout_left>;
 using IntView2D  = stdex::mdspan<const int, Extents2D, stdex::layout_left>;
+using IntViewMut2D = stdex::mdspan<int, Extents2D, stdex::layout_left>;
 
 } // namespace rrtmgp
