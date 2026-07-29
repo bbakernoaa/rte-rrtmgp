@@ -9,15 +9,17 @@ This directory contains the highly-optimized, standard-compliant C++17 port of t
 4. **Precision Agnostic**: Uses compile-time `real_t` type definitions to configure single or double precision builds globally.
 5. **Separation of Solvers & Optics**: Keeps physical solvers (`SolverLw`, `SolverSw`) completely decoupled from spectral parameterization databases (`GasOptics`, `CloudOptics`, `AerosolOptics`).
 6. **Thread-Safe Registry**: Stores concentrations dynamically under an uppercase normalized hash registry (`GasConcentrations`).
+7. **Exascale-Grade GPU/CPU Parallelism**: Support compiling with the full Kokkos Core C++ framework to fuse optics and solvers into unified high-performance hardware-coalesced parallel loop sweeps.
 
 ## Directory Structure
-- `include/`: API headers, `mdspan.hpp` backport, kind types, solver kernels, and extensions.
-- `src/`: Optical properties, dynamic registries, solvers, scattering kernels, and post-processing extensions.
-- `tests/`: GTest/CTest compatible unit tests and full end-to-end verification suites.
+- `include/`: API headers, `mdspan.hpp` backport, kind types, solver kernels, extensions, and `mo_kokkos_megakernel.h`.
+- `src/`: Optical properties, dynamic registries, solvers, scattering kernels, extensions, and `mo_kokkos_megakernel.cpp`.
+- `tests/`: GTest/CTest compatible unit tests and parallel benchmark suites.
 
 ## Compilation & Verification
 
-To compile using CMake:
+### Standard Build (Zero-Dependency)
+To compile the standard baseline sequential library using CMake:
 ```bash
 # Configure the build directory
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
@@ -25,7 +27,26 @@ cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
 # Build targets
 cmake --build cpp/build --parallel
 
-# Execute the entire CTest suite (10 registered tests)
+# Execute the entire CTest suite (12 registered tests)
+ctest --test-dir cpp/build --output-on-failure
+```
+
+### High-Performance Kokkos Build (GPU/CPU Team Policies)
+To compile with the Kokkos Megakernel enabled:
+```bash
+# Configure enabling Kokkos
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release -DENABLE_KOKKOS=ON
+
+# On macOS, supply standard Homebrew OpenMP compiler/linker flags:
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release -DENABLE_KOKKOS=ON \
+  -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include" \
+  -DOpenMP_CXX_LIB_NAMES="omp" \
+  -DOpenMP_omp_LIBRARY="/opt/homebrew/opt/libomp/lib/libomp.dylib"
+
+# Build targets
+cmake --build cpp/build --parallel
+
+# Execute the entire CTest suite including test_kokkos_megakernel
 ctest --test-dir cpp/build --output-on-failure
 ```
 
