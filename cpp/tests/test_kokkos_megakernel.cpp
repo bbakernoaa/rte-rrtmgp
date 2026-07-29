@@ -1,6 +1,7 @@
 #include "mo_kokkos_megakernel.h"
 #include <iostream>
 #include <stdexcept>
+#include <cmath>
 
 using namespace rrtmgp;
 
@@ -26,6 +27,38 @@ int main(int argc, char* argv[]) {
         KView1D toa_alloc("toa", gpoints);
         KView2D flux_dir("flux_dir", gpoints, columns);
 
+        // Access view host mirrors to populate values (FR-006)
+        auto play_host = Kokkos::create_mirror_view(play_alloc);
+        auto tlay_host = Kokkos::create_mirror_view(tlay_alloc);
+        auto kmajor_host = Kokkos::create_mirror_view(kmajor_alloc);
+        auto clwp_host = Kokkos::create_mirror_view(clwp_alloc);
+        auto lut_liquid_host = Kokkos::create_mirror_view(lut_liquid_alloc);
+
+        // Populate baseline atmospheric profiles
+        for (size_t col = 0; col < columns; ++col) {
+            for (size_t lay = 0; lay < layers; ++lay) {
+                play_host(lay, col) = 1000.0;
+                tlay_host(lay, col) = 290.0;
+                clwp_host(lay, col) = 0.2;
+            }
+        }
+
+        for (size_t gp = 0; gp < gpoints; ++gp) {
+            for (size_t i = 0; i < 2; ++i) {
+                for (size_t j = 0; j < 2; ++j) {
+                    lut_liquid_host(gp, i, j) = 5.0;
+                    kmajor_host(gp, i, j, 0) = 2.5;
+                }
+            }
+        }
+
+        // Deep copy values from Host to Device memory spaces
+        Kokkos::deep_copy(play_alloc, play_host);
+        Kokkos::deep_copy(tlay_alloc, tlay_host);
+        Kokkos::deep_copy(kmajor_alloc, kmajor_host);
+        Kokkos::deep_copy(clwp_alloc, clwp_host);
+        Kokkos::deep_copy(lut_liquid_alloc, lut_liquid_host);
+
         // Implicitly cast to read-only views for execution contract interfaces
         KConstView2D play = play_alloc;
         KConstView2D tlay = tlay_alloc;
@@ -36,26 +69,42 @@ int main(int argc, char* argv[]) {
         KConstView1D sza = sza_alloc;
         KConstView1D toa = toa_alloc;
 
-        std::cout << "T003: Successfully allocated Kokkos Views on Host/Device space." << std::endl;
+        std::cout << "T003: Successfully allocated and deep-copied View vectors." << std::endl;
 
-        // TDD RED Phase: Expected to throw runtime_error since execute_megakernel is unimplemented
+        // Execute fused Megakernel on Device space
         KokkosMegakernel::execute_megakernel(
             layers, columns, gpoints,
             play, tlay, kmajor, kminor, clwp, lut_liquid, sza, toa, flux_dir
         );
 
-        std::cerr << "test_kokkos_megakernel FAIL: Expected exception not thrown!" << std::endl;
-        Kokkos::finalize();
-        return 1;
-    } catch (const std::runtime_error& e) {
-        std::cout << "T003 RED: Successfully caught expected runtime_error: " << e.what() << std::endl;
+        // Pull output fluxes back to Host to verify numerical parity
+        auto flux_host = Kokkos::create_mirror_view(flux_dir);
+        Kokkos::deep_copy(flux_host, flux_dir);
+
+        // Expected output:
+        // For each layer:
+        // tau_gas = kmajor(2.5) * play(1000) * tlay(290) * 1e-6 = 0.725
+        // tau_cloud = clwp(0.2) * lut_liquid(5) = 1.0
+        // accumulated_flux = (0.725 + 1.0) * 10 = 17.25
+        // 5 layers = 17.25 * 5 = 86.25
+        real_t expected_flux = 86.25;
+
+        std::cout << "Computed output flux at gp0 col0: " << flux_host(0, 0) << std::endl;
+        std::cout << "Expected output flux: " << expected_flux << std::endl;
+
+        if (std::abs(flux_host(0, 0) - expected_flux) >= 1e-6) {
+            std::cerr << "test_kokkos_megakernel FAIL: Mismatched computed values!" << std::endl;
+            Kokkos::finalize();
+            return 1;
+        }
+
+        std::cout << "test_kokkos_megakernel: SUCCESS (Numerical parity verified)" << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "test_kokkos_megakernel FAIL with unexpected exception: " << e.what() << std::endl;
+        std::cerr << "test_kokkos_megakernel FAIL with exception: " << e.what() << std::endl;
         Kokkos::finalize();
         return 1;
     }
 
     Kokkos::finalize();
-    std::cout << "test_kokkos_megakernel: SUCCESS (RED phase verified)" << std::endl;
     return 0;
 }
