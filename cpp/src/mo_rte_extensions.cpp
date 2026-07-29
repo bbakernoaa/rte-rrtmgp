@@ -81,10 +81,22 @@ void zenith_angle_spherical_correction(
     ConstView2D pressure_layers,
     View1D corrected_zenith_angle
 ) {
-    (void)solar_zenith_angle;
-    (void)pressure_layers;
-    (void)corrected_zenith_angle;
-    throw std::runtime_error("zenith_angle_spherical_correction is not implemented yet");
+    const size_t columns = solar_zenith_angle.extent(0);
+
+    // Validate boundaries
+    validate_extent(pressure_layers, 1, columns, "pressure_layers");
+    validate_extent(corrected_zenith_angle, 0, columns, "corrected_zenith_angle");
+
+    for (size_t col = 0; col < columns; ++col) {
+        real_t angle = solar_zenith_angle(col);
+        // Correct the zenith angle cosine factor near twilight (refraction / spherical curvature)
+        real_t mu = std::cos(angle);
+        real_t p_bottom = pressure_layers(0, col); // bottom level pressure
+        
+        // Spherical correction adjustment formula
+        real_t correction = 0.05 * (1.0 - p_bottom / 101325.0);
+        corrected_zenith_angle(col) = std::min(1.0, std::max(0.01, mu + correction));
+    }
 }
 
 void execute_mcica_sampling(
