@@ -20,6 +20,7 @@ add_library(rrtmgp_cpp
     src/mo_rte_solver_kernels.cpp
     src/mo_cloud_optics.cpp
     src/mo_rte_extensions.cpp
+    src/mo_rte_sw.cpp
 )
 
 target_include_directories(rrtmgp_cpp PUBLIC

@@ -4,6 +4,8 @@
 
 namespace rte {
 
+using namespace rrtmgp;
+
 class SolverSw {
 public:
     static void solve_sw_noscat(
@@ -29,6 +31,8 @@ public:
 } // namespace rte
 
 namespace rte::kernels {
+
+using namespace rrtmgp;
 
 void sw_dif_and_source(
     ConstView3D tau,
