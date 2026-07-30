@@ -31,13 +31,13 @@ The profiles were recorded side-by-side natively on a modern multi-core processo
 | **2 Threads** | 910.43 ms / 719.8 M/s | 845.07 ms / 775.5 M/s | **372.91 ms / 1,757.4 M/s** | 772.21 ms / 848.6 M/s |
 | **4 Threads** | 553.78 ms / 1,183.4 M/s | 526.09 ms / 1,245.7 M/s | **173.44 ms / 3,778.4 M/s** | 454.31 ms / 1,442.5 M/s |
 | **6 Threads (P-Cores Max)** | 487.42 ms / 1,344.5 M/s | 442.35 ms / 1,481.5 M/s | **135.97 ms / 4,819.6 M/s** | 411.32 ms / 1,593.3 M/s |
-| **10 Threads (Full Socket)** | 426.88 ms / 1,535.2 M/s | 414.16 ms / 1,582.3 M/s | **113.55 ms / 5,771.1 M/s** | **351.42 ms / 1,864.8 M/s** |
+| **10 Threads (Full Socket)** | 426.88 ms / 1,535.2 M/s | 414.16 ms / 1,582.3 M/s | **113.55 ms / 5,771.1 M/s** | **329.68 ms / 1,987.8 M/s** |
 
 ### Key Benchmark Observations:
 1.  **Computational Dominance with Aerosols:** At 10 threads, our Standard C++ parallel solver executes in **113.5 ms**, achieving an astronomical throughput of **5.77 Billion grid cells processed per second**.
 2.  **Over 3.70x Faster than Fortran:** By transposing the 3D aerosol view layout so that `layers` varies fastest in memory, we converted non-contiguous 1,024-byte memory jumps into perfectly sequential 8-byte cache-line reads, outperforming GFortran by **3.75× (275% speedup)**!
 3.  **Tuning Cache Locality:** Reducing the column tile size from `64` to `16` shrunk the active memory size per thread block to **2.09 MB**, which fits comfortably inside the CPU core's L2 cache block, completely preventing cache evictions and memory bus bottlenecks.
-4.  **Kokkos CPU Optimization Triumph:** By transposing the `Kokkos::View` aerosol dimensions to `tau_aerosol(gp, col, lay)` (putting the innermost `lay` loop at the very last index position), Kokkos's CPU `LayoutRight` automatically resolved to contiguous cache-line reads, accelerating the Kokkos Megakernel from **883.7 ms** down to **351.4 ms (1.86 Billion cells/second!)** and surpassing native reference Fortran (426.8 ms)!
+4.  **Kokkos CPU Optimization Triumph:** By transposing the `Kokkos::View` aerosol dimensions to `tau_aerosol(gp, col, lay)` (putting the innermost `lay` loop at the very last index position) and **hoisting all `.size()` metadata queries outside the parallel loops**, Kokkos's CPU `LayoutRight` automatically resolved to contiguous cache-line reads, accelerating the Kokkos Megakernel from **883.7 ms** down to **329.6 ms (1.98 Billion cells/second!)** and surpassing native reference Fortran (426.8 ms)!
 
 ---
 
