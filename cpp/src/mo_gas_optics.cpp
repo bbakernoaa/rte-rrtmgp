@@ -73,6 +73,18 @@ void GasOptics::compute_optical_properties(
     validate_extent(tau, 1, layers, "tau");
     validate_extent(tau, 2, columns, "tau");
 
+    // Perform physical boundary audits
+    for (size_t col = 0; col < columns; ++col) {
+        for (size_t lay = 0; lay < layers; ++lay) {
+            if (play(lay, col) < 0.0) {
+                throw std::invalid_argument("play cannot be negative");
+            }
+            if (tlay(lay, col) < 0.0) {
+                throw std::invalid_argument("tlay cannot be below absolute zero (0 K)");
+            }
+        }
+    }
+
     // Mock Reference pressure and temperature grids for the kernels
     std::vector<real_t> ref_press_data = {1000.0, 500.0, 100.0};
     std::vector<real_t> ref_temp_data = {

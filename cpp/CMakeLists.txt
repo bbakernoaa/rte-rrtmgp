@@ -65,6 +65,14 @@ add_rrtmgp_test(test_cloud_sampling)
 
 if(ENABLE_KOKKOS)
     add_rrtmgp_test(test_kokkos_megakernel)
+    
+    add_executable(test_profile_fuzzer 
+        tests/test_profile_fuzzer.cpp 
+        tests/fuzzer_std_run.cpp 
+        tests/fuzzer_kokkos_run.cpp
+    )
+    target_link_libraries(test_profile_fuzzer PRIVATE rrtmgp_cpp)
+    add_test(NAME test_profile_fuzzer COMMAND test_profile_fuzzer)
 endif()
 
 # Validation runner executable
