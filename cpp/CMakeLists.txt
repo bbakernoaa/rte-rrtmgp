@@ -28,10 +28,11 @@ add_library(rrtmgp_cpp
     src/mo_cloud_optics.cpp
     src/mo_rte_extensions.cpp
     src/mo_rte_sw.cpp
+    src/mo_rte_c_api.cpp
 )
 
 if(ENABLE_KOKKOS)
-    target_sources(rrtmgp_cpp PRIVATE src/mo_kokkos_megakernel.cpp src/mo_rte_c_api.cpp)
+    target_sources(rrtmgp_cpp PRIVATE src/mo_kokkos_megakernel.cpp)
     target_link_libraries(rrtmgp_cpp PUBLIC Kokkos::kokkos)
 endif()
 
