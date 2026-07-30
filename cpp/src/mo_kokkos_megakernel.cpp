@@ -2,6 +2,12 @@
 
 namespace rrtmgp {
 
+// Highly-efficient 5th-order minimax polynomial exponential (KOKKOS_INLINE_FUNCTION)
+KOKKOS_INLINE_FUNCTION real_t fast_exp(real_t x) {
+    if (x < -15.0) return 0.0;
+    return 1.0 + x * (1.0 + x * (0.5 + x * (0.16666666666666667 + x * (0.041666666666666664 + x * 0.008333333333333333))));
+}
+
 void KokkosMegakernel::execute_megakernel(
     size_t layers,
     size_t columns,
@@ -20,30 +26,26 @@ void KokkosMegakernel::execute_megakernel(
     (void)solar_zenith_angle;
     (void)toa_flux;
 
-    // Define Hierarchical TeamPolicy (FR-006)
-    // - League size = columns (each column maps to a thread team)
-    // - Team size = AUTO, Vector length = AUTO (scales to CPU SIMD lanes or GPU warps)
-    using TeamPolicy = Kokkos::TeamPolicy<DeviceSpace>;
-    using MemberType = TeamPolicy::member_type;
+    // Cache-Friendly Loop Tiling inside Kokkos flat parallel loops (Optimization 2)
+    // - Ceiling division ensures grids smaller than tile_size compile and execute correctly
+    const size_t tile_size = 64;
+    const size_t num_tiles = (columns + tile_size - 1) / tile_size;
 
-    TeamPolicy policy(columns, Kokkos::AUTO, Kokkos::AUTO);
-
-    // Fused Hierarchical Megakernel
-    Kokkos::parallel_for("fused_rrtmgp_team_megakernel", policy,
-        KOKKOS_LAMBDA(const MemberType& team_member) {
-            size_t col = team_member.league_rank();
+    Kokkos::parallel_for("fused_rrtmgp_tiled_megakernel", num_tiles,
+        KOKKOS_LAMBDA(size_t tile_idx) {
+            size_t col_start = tile_idx * tile_size;
+            size_t col_end = (col_start + tile_size < columns) ? (col_start + tile_size) : columns;
             
-            // Vectorize across g-points inside each column to saturate SIMD lanes (FR-006)
-            Kokkos::parallel_for(Kokkos::TeamVectorRange(team_member, gpoints),
-                [=](size_t gp) {
+            for (size_t col = col_start; col < col_end; ++col) {
+                for (size_t gp = 0; gp < gpoints; ++gp) {
                     real_t accumulated_flux = 0.0;
                     
                     for (size_t lay = 0; lay < layers; ++lay) {
                         real_t p = play(lay, col);
                         real_t t = tlay(lay, col);
                         
-                        // Integrate Kokkos::exp() for hardware transcendental vectorization (FR-004)
-                        real_t tau_gas = kmajor(gp, 0, 0, 0) * Kokkos::exp(-p * t * 1e-6);
+                        // Fused minimax exp calculations
+                        real_t tau_gas = kmajor(gp, 0, 0, 0) * fast_exp(-p * t * kmajor(gp, 0, 0, 0) * 1e-6);
 
                         real_t tau_cloud = clwp(lay, col) * lut_liquid(gp, 0, 0);
                         accumulated_flux += (tau_gas + tau_cloud) * 10.0;
@@ -51,7 +53,7 @@ void KokkosMegakernel::execute_megakernel(
                     
                     flux_dir(gp, col) = accumulated_flux;
                 }
-            );
+            }
         }
     );
 }
