@@ -4,14 +4,11 @@
 
 namespace rrtmgp {
 
-// Decoupled precision parameter
 using real_t = double;
 
-// Kokkos Device and Host Execution Spaces
 using DeviceSpace = Kokkos::DefaultExecutionSpace;
 using HostSpace   = Kokkos::DefaultHostExecutionSpace;
 
-// Dynamic N-Dimensional Views on Device Memory
 using KView1D = Kokkos::View<real_t*, DeviceSpace>;
 using KView2D = Kokkos::View<real_t**, DeviceSpace>;
 using KView3D = Kokkos::View<real_t***, DeviceSpace>;
@@ -24,7 +21,7 @@ using KConstView4D = Kokkos::View<const real_t****, DeviceSpace>;
 
 class KokkosMegakernel {
 public:
-    // Fused Megakernel executing GasOptics, CloudOptics, and SolverSw in a single parallel sweep
+    // Fused Megakernel executing GasOptics, CloudOptics, AerosolOptics, and SolverSw in a single parallel sweep
     static void execute_megakernel(
         size_t layers,
         size_t columns,
@@ -37,6 +34,9 @@ public:
         KConstView3D lut_liquid,
         KConstView1D solar_zenith_angle,
         KConstView1D toa_flux,
+        KConstView3D tau_aerosol,
+        KConstView3D ssa_aerosol,
+        KConstView3D g_aerosol,
         KView2D flux_dir
     );
 };

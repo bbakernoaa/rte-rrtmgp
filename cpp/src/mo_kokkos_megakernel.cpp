@@ -20,14 +20,18 @@ void KokkosMegakernel::execute_megakernel(
     KConstView3D lut_liquid,
     KConstView1D solar_zenith_angle,
     KConstView1D toa_flux,
+    KConstView3D tau_aerosol,
+    KConstView3D ssa_aerosol,
+    KConstView3D g_aerosol,
     KView2D flux_dir
 ) {
     (void)kminor;
     (void)solar_zenith_angle;
     (void)toa_flux;
+    (void)ssa_aerosol;
+    (void)g_aerosol;
 
     // Cache-Friendly Loop Tiling inside Kokkos flat parallel loops (Optimization 2)
-    // - Ceiling division ensures grids smaller than tile_size compile and execute correctly
     const size_t tile_size = 64;
     const size_t num_tiles = (columns + tile_size - 1) / tile_size;
 
@@ -48,7 +52,15 @@ void KokkosMegakernel::execute_megakernel(
                         real_t tau_gas = kmajor(gp, 0, 0, 0) * fast_exp(-p * t * kmajor(gp, 0, 0, 0) * 1e-6);
 
                         real_t tau_cloud = clwp(lay, col) * lut_liquid(gp, 0, 0);
-                        accumulated_flux += (tau_gas + tau_cloud) * 10.0;
+                        
+                        // Fused aerosol optics combinations (FR-005)
+                        real_t tau_aero = 0.0;
+                        if (tau_aerosol.size() > 0) {
+                            tau_aero = tau_aerosol(gp, lay, col);
+                        }
+
+                        real_t tau_total = tau_gas + tau_cloud + tau_aero;
+                        accumulated_flux += tau_total * 10.0;
                     }
                     
                     flux_dir(gp, col) = accumulated_flux;

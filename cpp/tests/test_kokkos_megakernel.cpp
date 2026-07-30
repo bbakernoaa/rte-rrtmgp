@@ -27,6 +27,7 @@ int main(int argc, char* argv[]) {
             KView3D lut_liquid_alloc("lut_liquid", gpoints, 2, 2);
             KView1D sza_alloc("sza", columns);
             KView1D toa_alloc("toa", gpoints);
+            KView3D tau_aerosol_alloc("tau_aerosol", gpoints, layers, columns); // Aerosol depth (FR-005)
             KView2D flux_dir("flux_dir", gpoints, columns);
 
             // Access view host mirrors to populate values
@@ -35,6 +36,7 @@ int main(int argc, char* argv[]) {
             auto kmajor_host = Kokkos::create_mirror_view(kmajor_alloc);
             auto clwp_host = Kokkos::create_mirror_view(clwp_alloc);
             auto lut_liquid_host = Kokkos::create_mirror_view(lut_liquid_alloc);
+            auto tau_aero_host = Kokkos::create_mirror_view(tau_aerosol_alloc);
 
             // Populate baseline atmospheric profiles
             for (size_t col = 0; col < columns; ++col) {
@@ -42,6 +44,9 @@ int main(int argc, char* argv[]) {
                     play_host(lay, col) = 1000.0;
                     tlay_host(lay, col) = 290.0;
                     clwp_host(lay, col) = 0.2;
+                    for (size_t gp = 0; gp < gpoints; ++gp) {
+                        tau_aero_host(gp, lay, col) = 0.1;
+                    }
                 }
             }
 
@@ -60,6 +65,7 @@ int main(int argc, char* argv[]) {
             Kokkos::deep_copy(kmajor_alloc, kmajor_host);
             Kokkos::deep_copy(clwp_alloc, clwp_host);
             Kokkos::deep_copy(lut_liquid_alloc, lut_liquid_host);
+            Kokkos::deep_copy(tau_aerosol_alloc, tau_aero_host);
 
             KConstView2D play = play_alloc;
             KConstView2D tlay = tlay_alloc;
@@ -69,11 +75,13 @@ int main(int argc, char* argv[]) {
             KConstView3D lut_liquid = lut_liquid_alloc;
             KConstView1D sza = sza_alloc;
             KConstView1D toa = toa_alloc;
+            KConstView3D tau_aerosol = tau_aerosol_alloc;
 
             // Execute fused Megakernel on Device space
             KokkosMegakernel::execute_megakernel(
                 layers, columns, gpoints,
-                play, tlay, kmajor, kminor, clwp, lut_liquid, sza, toa, flux_dir
+                play, tlay, kmajor, kminor, clwp, lut_liquid, sza, toa,
+                tau_aerosol, KConstView3D(), KConstView3D(), flux_dir
             );
 
             auto flux_host = Kokkos::create_mirror_view(flux_dir);
@@ -95,7 +103,14 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
 
-            real_t expected_flux = 110.518;
+            // Expected value with aerosol depth included:
+            // tau_gas = exp(-1000 * 290 * 2.5 * 1e-6) = exp(-0.725) = 0.484323
+            // tau_gas_fused = 2.5 * exp(-0.725) = 1.210808
+            // tau_cloud = clwp(0.2) * 5 = 1.0
+            // tau_aero = 0.1
+            // accum = (1.210808 + 1.0 + 0.1) * 10 = 23.10808
+            // 5 layers = 23.10808 * 5 = 115.5404
+            real_t expected_flux = 115.518;
             std::cout << "Computed verification flux: " << flux_host(0, 0) << std::endl;
             if (std::abs(flux_host(0, 0) - expected_flux) >= 1e-3) {
                 std::cerr << "test_kokkos_megakernel FAIL: Mismatched computed values!" << std::endl;
@@ -106,7 +121,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Verification Mode: SUCCESS (Functional parity verified)" << std::endl;
         }
 
-        // --- 2. Cache Saturation Benchmark Mode (50x50 Columns, 128 Layers, 128 Gpoints) ---
+        // --- 2. Cache Saturation Benchmark Mode (200x200 Columns, 128 Layers, 128 Gpoints) ---
         {
             std::cout << "\nStarting Cache Saturation Benchmark (200x200 Column Set)..." << std::endl;
             const size_t layers = 128;
@@ -125,6 +140,7 @@ int main(int argc, char* argv[]) {
             KView3D lut_liquid_alloc("lut_liquid", gpoints, 2, 2);
             KView1D sza_alloc("sza", columns);
             KView1D toa_alloc("toa", gpoints);
+            KView3D tau_aerosol_alloc("tau_aerosol", gpoints, layers, columns); // Aerosol path View
             KView2D flux_dir("flux_dir", gpoints, columns);
 
             // Populate on Host mirrors
@@ -133,12 +149,16 @@ int main(int argc, char* argv[]) {
             auto clwp_host = Kokkos::create_mirror_view(clwp_alloc);
             auto kmajor_host = Kokkos::create_mirror_view(kmajor_alloc);
             auto lut_liquid_host = Kokkos::create_mirror_view(lut_liquid_alloc);
+            auto tau_aero_host = Kokkos::create_mirror_view(tau_aerosol_alloc);
 
             for (size_t col = 0; col < columns; ++col) {
                 for (size_t lay = 0; lay < layers; ++lay) {
                     play_host(lay, col) = 1000.0;
                     tlay_host(lay, col) = 290.0;
                     clwp_host(lay, col) = 0.2;
+                    for (size_t gp = 0; gp < gpoints; ++gp) {
+                        tau_aero_host(gp, lay, col) = 0.1;
+                    }
                 }
             }
 
@@ -157,6 +177,7 @@ int main(int argc, char* argv[]) {
             Kokkos::deep_copy(kmajor_alloc, kmajor_host);
             Kokkos::deep_copy(clwp_alloc, clwp_host);
             Kokkos::deep_copy(lut_liquid_alloc, lut_liquid_host);
+            Kokkos::deep_copy(tau_aerosol_alloc, tau_aero_host);
 
             KConstView2D play = play_alloc;
             KConstView2D tlay = tlay_alloc;
@@ -166,11 +187,13 @@ int main(int argc, char* argv[]) {
             KConstView3D lut_liquid = lut_liquid_alloc;
             KConstView1D sza = sza_alloc;
             KConstView1D toa = toa_alloc;
+            KConstView3D tau_aerosol = tau_aerosol_alloc;
 
             // Warm up run to prime instruction caches
             KokkosMegakernel::execute_megakernel(
                 layers, columns, gpoints,
-                play, tlay, kmajor, kminor, clwp, lut_liquid, sza, toa, flux_dir
+                play, tlay, kmajor, kminor, clwp, lut_liquid, sza, toa,
+                tau_aerosol, KConstView3D(), KConstView3D(), flux_dir
             );
             Kokkos::fence();
 
@@ -181,7 +204,8 @@ int main(int argc, char* argv[]) {
             for (int i = 0; i < iterations; ++i) {
                 KokkosMegakernel::execute_megakernel(
                     layers, columns, gpoints,
-                    play, tlay, kmajor, kminor, clwp, lut_liquid, sza, toa, flux_dir
+                    play, tlay, kmajor, kminor, clwp, lut_liquid, sza, toa,
+                    tau_aerosol, KConstView3D(), KConstView3D(), flux_dir
                 );
             }
             Kokkos::fence();

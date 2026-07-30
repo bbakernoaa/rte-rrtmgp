@@ -5,10 +5,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(ENABLE_KOKKOS "Enable Kokkos high-performance megakernel" OFF)
+option(ENABLE_FAST_EXP "Enable 5th-order minimax polynomial exponential approximation" OFF)
 
 if(ENABLE_KOKKOS)
     find_package(Kokkos REQUIRED)
     add_compile_definitions(ENABLE_KOKKOS)
+endif()
+
+if(ENABLE_FAST_EXP)
+    add_compile_definitions(ENABLE_FAST_EXP)
 endif()
 
 # Compile options for robustness and performance

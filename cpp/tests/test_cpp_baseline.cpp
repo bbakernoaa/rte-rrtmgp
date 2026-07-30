@@ -9,10 +9,8 @@
 using real_t = double;
 
 // 5th-order Minimax Polynomial Approximation of exp(x) for x <= 0 (Optimization 1)
-// Extremely fast, branching-free, and designed for vectorization.
 inline real_t fast_exp(real_t x) {
     if (x < -15.0) return 0.0;
-    // Horner's scheme for polynomial evaluation
     return 1.0 + x * (1.0 + x * (0.5 + x * (0.16666666666666667 + x * (0.041666666666666664 + x * 0.008333333333333333))));
 }
 
@@ -27,6 +25,7 @@ int main() {
     std::vector<real_t> clwp(layers * columns, 0.2);
     std::vector<real_t> kmajor(gpoints, 2.5);
     std::vector<real_t> lut_liquid(gpoints, 5.0);
+    std::vector<real_t> tau_aerosol(gpoints * layers * columns, 0.1); // Aerosol path array (FR-005)
 
     // Outputs for comparison
     std::vector<real_t> flux_standard(gpoints * columns, 0.0);
@@ -47,7 +46,11 @@ int main() {
                         real_t t = tlay[lay + col * layers];
                         real_t tau_gas = kmajor[gp] * std::exp(-p * t * kmajor[gp] * 1e-6);
                         real_t tau_cloud = clwp[lay + col * layers] * lut_liquid[gp];
-                        accumulated_flux += (tau_gas + tau_cloud) * 10.0;
+                        
+                        size_t aero_idx = gp + lay * gpoints + col * gpoints * layers;
+                        real_t tau_aero = tau_aerosol[aero_idx];
+
+                        accumulated_flux += (tau_gas + tau_cloud + tau_aero) * 10.0;
                     }
                     flux_standard[gp + col * gpoints] = accumulated_flux;
                 }
@@ -66,10 +69,13 @@ int main() {
                     for (size_t lay = 0; lay < layers; ++lay) {
                         real_t p = play[lay + col * layers];
                         real_t t = tlay[lay + col * layers];
-                        // Using our fast polynomial exponential
                         real_t tau_gas = kmajor[gp] * fast_exp(-p * t * kmajor[gp] * 1e-6);
                         real_t tau_cloud = clwp[lay + col * layers] * lut_liquid[gp];
-                        accumulated_flux += (tau_gas + tau_cloud) * 10.0;
+                        
+                        size_t aero_idx = gp + lay * gpoints + col * gpoints * layers;
+                        real_t tau_aero = tau_aerosol[aero_idx];
+
+                        accumulated_flux += (tau_gas + tau_cloud + tau_aero) * 10.0;
                     }
                     flux_fast[gp + col * gpoints] = accumulated_flux;
                 }
@@ -112,7 +118,6 @@ int main() {
     // --- 3. Precision Degradation Analysis ---
     double max_abs_error = 0.0;
     double max_rel_error = 0.0;
-    size_t err_count = 0;
 
     for (size_t i = 0; i < gpoints * columns; ++i) {
         double diff = std::abs(flux_standard[i] - flux_fast[i]);

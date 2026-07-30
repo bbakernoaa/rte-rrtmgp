@@ -4,6 +4,7 @@ program test_fortran_megakernel
   integer :: layers, columns, gpoints
   real(8), allocatable :: play(:,:), tlay(:,:), clwp(:,:)
   real(8), allocatable :: kmajor(:,:,:,:), lut_liquid(:,:,:)
+  real(8), allocatable :: tau_aerosol(:,:,:)
   real(8), allocatable :: flux_dir(:,:)
   integer :: iter, iterations
   integer(8) :: count_rate, count_start, count_end
@@ -19,6 +20,7 @@ program test_fortran_megakernel
   allocate(clwp(layers, columns))
   allocate(kmajor(gpoints, 2, 2, 1))
   allocate(lut_liquid(gpoints, 2, 2))
+  allocate(tau_aerosol(gpoints, layers, columns))
   allocate(flux_dir(gpoints, columns))
 
   play = 1000.0_8
@@ -26,6 +28,7 @@ program test_fortran_megakernel
   clwp = 0.2_8
   lut_liquid = 5.0_8
   kmajor = 2.5_8
+  tau_aerosol = 0.1_8 ! Background aerosol optical depth
   flux_dir = 0.0_8
 
   ! Warm up
@@ -55,7 +58,8 @@ contains
              ! Forcing exponential calculation to depend on g-point, preventing compiler hoisting (LICM)
              tau_gas = exp(-play(l, c) * tlay(l, c) * kmajor(g, 1, 1, 1) * 1e-6_8)
              tau_cloud = clwp(l, c) * lut_liquid(g, 1, 1)
-             tau_total = tau_gas + tau_cloud
+             ! Incorporating Aerosol Optical Depth natively (FR-005)
+             tau_total = tau_gas + tau_cloud + tau_aerosol(g, l, c)
              flux_dir(g, c) = flux_dir(g, c) + tau_total * 10.0_8
           end do
        end do
