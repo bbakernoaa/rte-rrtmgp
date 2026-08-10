@@ -45,20 +45,20 @@ void c_execute_megakernel(
     KConstView3D lut_liquid_view(lut_liquid, gpoints, 2, 2);
     KConstView1D sza_view(sza, columns);
     KConstView1D toa_view(toa, gpoints);
-    
+
     // Aerosol Views
     KConstView3D tau_aero_view(tau_aerosol, gpoints, layers, columns);
     KConstView3D ssa_aero_view(ssa_aerosol, gpoints, layers, columns);
     KConstView3D g_aero_view(g_aerosol, gpoints, layers, columns);
-    
+
     KView2D flux_dir_view(flux_dir, gpoints, columns);
 
     KokkosMegakernel::execute_megakernel(
         layers, columns, gpoints,
-        play_view, tlay_view, kmajor_view, KConstView3D(), clwp_view, lut_liquid_view,
-        sza_view, toa_view, tau_aero_view, ssa_aero_view, g_aero_view, flux_dir_view
+        play_view, tlay_view, KConstView1D(), kmajor_view, KConstView3D(), clwp_view, lut_liquid_view,
+        sza_view, toa_view, tau_aero_view, ssa_aero_view, g_aero_view, KConstView2D(), flux_dir_view, KView2D()
     );
-    
+
     Kokkos::DefaultExecutionSpace().fence();
 
 #else
@@ -78,13 +78,13 @@ void c_execute_megakernel(
                 for (size_t lay = 0; lay < layers; ++lay) {
                     double p = play[lay + col * layers];
                     double t = tlay[lay + col * layers];
-                    
+
                     // 1. Gas optics absorption
                     double tau_gas = kmajor[gp] * fast_exp_std(-p * t * kmajor[gp] * 1e-6);
-                    
+
                     // 2. Cloud optics extinction
                     double tau_cloud = clwp[lay + col * layers] * lut_liquid[gp];
-                    
+
                     // 3. Aerosol optics extinction (FR-005)
                     size_t aero_idx = gp + lay * gpoints + col * gpoints * layers;
                     double tau_aero = tau_aerosol[aero_idx];

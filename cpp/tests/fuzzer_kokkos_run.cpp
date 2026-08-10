@@ -57,8 +57,8 @@ void run_kokkos_solvers(
 
     KokkosMegakernel::execute_megakernel(
         layers, columns, gpoints,
-        play_k, tlay_k, kmajor_k, kminor_k, clwp_k, lut_liquid_k, sza_k, toa_k,
-        KConstView3D(), KConstView3D(), KConstView3D(), flux_dir_k
+        play_k, tlay_k, KConstView1D(), kmajor_k, kminor_k, clwp_k, lut_liquid_k, sza_k, toa_k,
+        KConstView3D(), KConstView3D(), KConstView3D(), KConstView2D(), flux_dir_k, KView2D()
     );
 
     auto flux_host_k = Kokkos::create_mirror_view(flux_dir_k);
