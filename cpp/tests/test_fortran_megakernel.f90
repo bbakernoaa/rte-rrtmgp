@@ -13,16 +13,16 @@ program test_fortran_megakernel
   real(wp), allocatable :: tau_gas(:,:,:), tau_rayl(:,:,:), planck_src(:,:)
   real(wp), allocatable :: lay_source(:,:,:), lev_source(:,:,:), sfc_emis(:,:), inc_flux(:,:)
   real(wp), allocatable :: flux_up(:,:,:), flux_dn(:,:,:)
-  
+
   integer :: iter, iterations
   integer(8) :: count_rate, count_start, count_end
   real(8) :: elapsed_time, million_cells_per_sec
-  
+
   ! Dummy variables for interpolation
   integer, allocatable :: flavor(:,:)
   real(wp), allocatable :: press_ref_log(:), temp_ref(:), vmr_ref(:,:,:)
   real(wp) :: press_ref_log_delta, temp_ref_min, temp_ref_delta, press_ref_trop_log
-  
+
   ! Dummy variables for absorption
   integer :: nbnd, ngas, neta, npres, ntemp, nminorlower, nminorklower, nminorupper, nminorkupper, idx_h2o
   integer, allocatable :: gpoint_flavor(:,:), band_lims_gpt(:,:)
@@ -35,10 +35,10 @@ program test_fortran_megakernel
   integer, allocatable :: kminor_start_lower(:), kminor_start_upper(:)
 
   layers = 128
-  columns = 1000
+  columns = 40000
   gpoints = 128
   iterations = 10
-  
+
   nflav = 1
   ngas = 1
   neta = 2
@@ -56,26 +56,26 @@ program test_fortran_megakernel
   allocate(tlay(columns, layers))
   allocate(tsfc(columns))
   allocate(col_gas(columns, layers, 0:ngas))
-  
+
   allocate(jtemp(columns, layers))
   allocate(jpress(columns, layers))
   allocate(jeta(2, columns, layers, nflav))
   allocate(tropo(columns, layers))
   allocate(col_mix(2, columns, layers, nflav))
-  
+
   allocate(fmajor(2, 2, 2, columns, layers, nflav))
   allocate(fminor(2, 2, columns, layers, nflav))
   allocate(kmajor(ntemp, neta, npres+1, gpoints))
-  
+
   allocate(tau_gas(columns, layers, gpoints))
   allocate(tau_rayl(columns, layers, gpoints))
   allocate(planck_src(columns, gpoints))
-  
+
   allocate(lay_source(columns, layers, gpoints))
   allocate(lev_source(columns, layers+1, gpoints))
   allocate(sfc_emis(columns, gpoints))
   allocate(inc_flux(columns, gpoints))
-  
+
   allocate(flux_up(columns, layers+1, gpoints))
   allocate(flux_dn(columns, layers+1, gpoints))
 
@@ -90,7 +90,7 @@ program test_fortran_megakernel
   allocate(idx_minor_lower(1), idx_minor_upper(1))
   allocate(idx_minor_scaling_lower(1), idx_minor_scaling_upper(1))
   allocate(kminor_start_lower(1), kminor_start_upper(1))
-  
+
   flavor = 1
   press_ref_log = [log(1000.0_wp), log(500.0_wp), log(10.0_wp)]
   temp_ref = [200.0_wp, 300.0_wp]
@@ -109,12 +109,12 @@ program test_fortran_megakernel
   tsfc = 300.0_wp
   kmajor = 2.5_wp
   col_gas = 0.1_wp
-  
+
   lay_source = 1.0_wp
   lev_source = 1.0_wp
   sfc_emis = 1.0_wp
   inc_flux = 0.0_wp
-  
+
   tau_gas = 0.0_wp
   tau_rayl = 0.0_wp
   planck_src = 0.0_wp
@@ -141,14 +141,14 @@ program test_fortran_megakernel
 contains
 
   subroutine run_kernels()
-    integer :: g, nmus
+    integer :: g, nmus, b, nblocks, block_size, col_start, col_end, ncol_b
     real(wp), dimension(1) :: weight
     real(wp), dimension(columns, gpoints, 1) :: D_secant
     logical(wl) :: do_broadband, do_Jacobians, do_rescaling
     real(wp), dimension(columns, layers+1) :: broadband_up, broadband_dn, flux_upJac
     real(wp), dimension(columns, gpoints) :: sfc_srcJac
     real(wp), dimension(columns, layers, gpoints) :: ssa, g_param
-    
+
     nmus = 1
     D_secant = 1.66_wp
     weight(1) = 1.0_wp
@@ -156,46 +156,57 @@ contains
     do_Jacobians = .false.
     do_rescaling = .false.
 
-    !$omp parallel
-    !$omp master
-    call interpolation( &
-                columns, layers, ngas, nflav, neta, npres, ntemp, &
-                flavor, &
-                press_ref_log, temp_ref, press_ref_log_delta, &
-                temp_ref_min, temp_ref_delta, press_ref_trop_log, &
-                vmr_ref, &
-                play, tlay, col_gas, &
-                jtemp, fmajor, fminor, col_mix, tropo, jeta, jpress)
-                
-    call compute_tau_absorption( &
-                columns, layers, nbnd, gpoints, &
-                ngas, nflav, neta, npres, ntemp, &
-                nminorlower, nminorklower, nminorupper, nminorkupper, &
-                idx_h2o, gpoint_flavor, band_lims_gpt, &
-                kmajor, kminor_lower, kminor_upper, &
-                minor_limits_gpt_lower, minor_limits_gpt_upper, &
-                minor_scales_with_density_lower, minor_scales_with_density_upper, &
-                scale_by_complement_lower, scale_by_complement_upper, &
-                idx_minor_lower, idx_minor_upper, &
-                idx_minor_scaling_lower, idx_minor_scaling_upper, &
-                kminor_start_lower, kminor_start_upper, &
-                tropo, col_mix, fmajor, fminor, &
-                play, tlay, col_gas, jeta, jtemp, jpress, &
-                tau_gas)
-                
-    !$omp end master
-    !$omp barrier
+    block_size = 128
+    nblocks = (columns + block_size - 1) / block_size
 
-    ! Call the Fortran solver over all columns using the exact module subroutine
-    !$omp master
-    call lw_solver_noscat(columns, layers, gpoints, .true._wl, nmus, D_secant, weight, &
-                              tau_gas, lay_source, lev_source, sfc_emis, planck_src, &
-                              inc_flux, flux_up, flux_dn, &
-                              do_broadband, broadband_up, broadband_dn, &
-                              do_Jacobians, sfc_srcJac, flux_upJac, &
-                              do_rescaling, ssa, g_param)
-    !$omp end master
-    !$omp end parallel
+    !$omp parallel do private(b, col_start, col_end, ncol_b) schedule(static)
+    do b = 1, nblocks
+       col_start = (b - 1) * block_size + 1
+       col_end = min(b * block_size, columns)
+       ncol_b = col_end - col_start + 1
+
+       call interpolation( &
+                   ncol_b, layers, ngas, nflav, neta, npres, ntemp, &
+                   flavor, &
+                   press_ref_log, temp_ref, press_ref_log_delta, &
+                   temp_ref_min, temp_ref_delta, press_ref_trop_log, &
+                   vmr_ref, &
+                   play(col_start, 1), tlay(col_start, 1), col_gas(col_start, 1, 0), &
+                   jtemp(col_start, 1), fmajor(1, 1, 1, col_start, 1, 1), &
+                   fminor(1, 1, col_start, 1, 1), col_mix(1, col_start, 1, 1), &
+                   tropo(col_start, 1), jeta(1, col_start, 1, 1), jpress(col_start, 1))
+
+       call compute_tau_absorption( &
+                   ncol_b, layers, nbnd, gpoints, &
+                   ngas, nflav, neta, npres, ntemp, &
+                   nminorlower, nminorklower, nminorupper, nminorkupper, &
+                   idx_h2o, gpoint_flavor, band_lims_gpt, &
+                   kmajor, kminor_lower, kminor_upper, &
+                   minor_limits_gpt_lower, minor_limits_gpt_upper, &
+                   minor_scales_with_density_lower, minor_scales_with_density_upper, &
+                   scale_by_complement_lower, scale_by_complement_upper, &
+                   idx_minor_lower, idx_minor_upper, &
+                   idx_minor_scaling_lower, idx_minor_scaling_upper, &
+                   kminor_start_lower, kminor_start_upper, &
+                   tropo(col_start, 1), col_mix(1, col_start, 1, 1), &
+                   fmajor(1, 1, 1, col_start, 1, 1), fminor(1, 1, col_start, 1, 1), &
+                   play(col_start, 1), tlay(col_start, 1), col_gas(col_start, 1, 0), &
+                   jeta(1, col_start, 1, 1), jtemp(col_start, 1), jpress(col_start, 1), &
+                   tau_gas(col_start, 1, 1))
+
+       call lw_solver_noscat(ncol_b, layers, gpoints, .true._wl, nmus, D_secant(col_start, 1, 1), weight, &
+                                 tau_gas(col_start, 1, 1), lay_source(col_start, 1, 1), &
+                                 lev_source(col_start, 1, 1), sfc_emis(col_start, 1), &
+                                 planck_src(col_start, 1), &
+                                 inc_flux(col_start, 1), flux_up(col_start, 1, 1), &
+                                 flux_dn(col_start, 1, 1), &
+                                 do_broadband, broadband_up(col_start, 1), &
+                                 broadband_dn(col_start, 1), &
+                                 do_Jacobians, sfc_srcJac(col_start, 1), &
+                                 flux_upJac(col_start, 1), &
+                                 do_rescaling, ssa(col_start, 1, 1), g_param(col_start, 1, 1))
+    end do
+    !$omp end parallel do
   end subroutine run_kernels
 
 end program test_fortran_megakernel

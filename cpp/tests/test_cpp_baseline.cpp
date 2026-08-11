@@ -13,7 +13,7 @@ using namespace rte;
 
 int main() {
     const size_t layers = 128;
-    const size_t columns = 1000;
+    const size_t columns = 40000;
     const size_t gpoints = 128;
     const int iterations = 10;
 
@@ -46,39 +46,39 @@ int main() {
     gas_optics_std.vmr_ref = {0.1, 0.1, 0.1, 0.1};
     gas_optics_std.flavor = {1, 1};
     gas_optics_std.gpoint_flavor = std::vector<int>(2 * gpoints, 1);
-    
+
     // Arrays
     std::vector<real_t> play(layers * columns, 1000.0);
     std::vector<real_t> plev((layers + 1) * columns, 1000.0);
     std::vector<real_t> tlay(layers * columns, 290.0);
     std::vector<real_t> tsfc(columns, 300.0);
-    
+
     auto play_std = ConstView2D(play.data(), Extents2D(layers, columns));
     auto plev_std = ConstView2D(plev.data(), Extents2D(layers + 1, columns));
     auto tlay_std = ConstView2D(tlay.data(), Extents2D(layers, columns));
     auto tsfc_std = ConstView1D(tsfc.data(), Extents1D(columns));
 
     GasConcentrations gas_concs(layers, columns);
-    
+
     std::vector<real_t> tau_gas_std(gpoints * layers * columns, 0.0);
     auto tau_gas_view = View3D(tau_gas_std.data(), Extents3D(gpoints, layers, columns));
-    
+
     std::vector<real_t> tau_rayl_std(gpoints * layers * columns, 0.0);
     auto tau_rayl_view = View3D(tau_rayl_std.data(), Extents3D(gpoints, layers, columns));
-    
+
     std::vector<real_t> planck_src_std(gpoints * columns, 0.0);
     auto planck_src_view = View2D(planck_src_std.data(), Extents2D(gpoints, columns));
 
     // LW Solver Arrays
-    std::vector<real_t> lay_source_data(gpoints * layers * columns, 1.0); 
+    std::vector<real_t> lay_source_data(gpoints * layers * columns, 1.0);
     auto lay_source_view = ConstView3D(lay_source_data.data(), Extents3D(gpoints, layers, columns));
-    
+
     std::vector<real_t> lev_source_data(gpoints * (layers + 1) * columns, 1.0);
     auto lev_source_view = ConstView3D(lev_source_data.data(), Extents3D(gpoints, layers + 1, columns));
-    
+
     std::vector<real_t> sfc_emis_data(gpoints * columns, 1.0);
     auto sfc_emis_view = ConstView2D(sfc_emis_data.data(), Extents2D(gpoints, columns));
-    
+
     std::vector<real_t> inc_flux_data(gpoints * columns, 0.0);
     auto inc_flux_view = ConstView2D(inc_flux_data.data(), Extents2D(gpoints, columns));
 

@@ -1,8 +1,33 @@
 #include "mo_rte_solver_kernels.h"
 #include <cmath>
+#include <cstring>
+#include <limits>
 #include <algorithm>
 
 namespace rte::kernels {
+
+inline real_t fast_exp(real_t x) {
+#ifdef ENABLE_FAST_EXP
+    if (x < real_t(-87.0)) return real_t(0.0);
+    if (x > real_t(88.0))  return std::numeric_limits<real_t>::infinity();
+
+    constexpr real_t INV_LN2 = real_t(1.4426950408889634074);
+    constexpr real_t LN2     = real_t(0.6931471805599453094);
+
+    int k = static_cast<int>(x * INV_LN2 + (x < real_t(0.0) ? real_t(-0.5) : real_t(0.5)));
+    real_t r = x - static_cast<real_t>(k) * LN2;
+
+    real_t p = real_t(1.0) + r * (real_t(1.0) + r * (real_t(0.5) + r * (real_t(0.16666666666666667) + r * (real_t(0.041666666666666664) + r * real_t(0.008333333333333333)))));
+
+    uint64_t bits = static_cast<uint64_t>(static_cast<int64_t>(k) + 1023) << 52;
+    double twok;
+    std::memcpy(&twok, &bits, sizeof(double));
+
+    return p * twok;
+#else
+    return std::exp(x);
+#endif
+}
 
 void sw_dif_and_source(
     int ncol, int nlay, int gp,
@@ -29,7 +54,7 @@ void sw_dif_and_source(
             real_t gamma2 = 3.0 * (w0_s * (1.0 - g_s)) * 0.25;
 
             real_t k = std::sqrt(std::max((gamma1 - gamma2) * (gamma1 + gamma2), min_k));
-            real_t exp_minusktau = std::exp(-tau_s * k);
+            real_t exp_minusktau = fast_exp(-tau_s * k);
             real_t exp_minus2ktau = exp_minusktau * exp_minusktau;
 
             real_t RT_term = 1.0 / (k * (1.0 + exp_minus2ktau) + gamma1 * (1.0 - exp_minus2ktau));
@@ -51,7 +76,7 @@ void sw_dif_and_source(
 
             real_t k_gamma3 = k * gamma3;
             real_t k_gamma4 = k * gamma4;
-            real_t Tnoscat = std::exp(-tau_s / mu0_s);
+            real_t Tnoscat = fast_exp(-tau_s / mu0_s);
 
             real_t Rdir = RT_term *
                 ((1.0 - k_mu) * (alpha2 + k_gamma3) -

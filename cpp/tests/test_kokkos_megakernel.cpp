@@ -136,11 +136,11 @@ int main(int argc, char* argv[]) {
             std::cout << "Verification Mode: SUCCESS (Functional parity verified)" << std::endl;
         }
 
-        // --- 2. Cache Saturation Benchmark Mode (1000 Columns, 128 Layers, 128 Gpoints) ---
+        // --- 2. Cache Saturation Benchmark Mode (40000 Columns, 128 Layers, 128 Gpoints) ---
         {
-            std::cout << "\nStarting Cache Saturation Benchmark (1000 Column Set)..." << std::endl;
+            std::cout << "\nStarting Cache Saturation Benchmark (40000 Column Set)..." << std::endl;
             const size_t layers = 128;
-            const size_t columns = 1000; // 1000 columns benchmark
+            const size_t columns = 40000; // 40000 columns benchmark
             const size_t gpoints = 128;
 
             std::cout << "  - Configuration: " << columns << " columns, " << layers << " layers, " << gpoints << " g-points" << std::endl;

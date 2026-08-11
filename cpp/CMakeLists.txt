@@ -8,7 +8,7 @@ option(ENABLE_KOKKOS "Enable Kokkos high-performance megakernel" OFF)
 option(
   ENABLE_FAST_EXP
   "Enable 5th-order minimax polynomial exponential approximation"
-  OFF
+  ON
 )
 
 find_package(OpenMP)

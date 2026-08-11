@@ -14,8 +14,8 @@ if [[ ! -x "$FORTRAN_BIN" || ! -x "$CPP_BIN" || ! -x "$FUSED_CPP_BIN" || ! -x "$
 fi
 
 echo "=========================================================="
-echo "      RRTMGP PORT SCALING SWEEP (1000 COLUMNS GRID)"
-echo "      Total computed cells per iteration: 16.38 million"
+echo "      RRTMGP PORT SCALING SWEEP (40,000 COLUMNS GRID)"
+echo "      Total computed cells per iteration: 655.36 million"
 echo "=========================================================="
 echo ""
 
