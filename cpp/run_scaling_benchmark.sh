@@ -34,18 +34,18 @@ for t in "${THREADS[@]}"; do
     echo "  Configuring OMP_NUM_THREADS=$t"
     echo "----------------------------------------------------------"
     export OMP_NUM_THREADS=$t
-    
+
     echo "[1. Reference Fortran OpenMP]"
     "$FORTRAN_BIN"
-    
+
     echo "[2. Modular Standard C++]"
     "$CPP_BIN"
-    
+
     echo "[3. Fused Standard C++ Megakernel]"
     "$FUSED_CPP_BIN" | grep -A 3 "Benchmark Results"
-    
+
     echo "[4. Kokkos Parallel Megakernel]"
     "$KOKKOS_BIN" | grep -A 3 "Benchmark Results"
-    
+
     echo ""
 done

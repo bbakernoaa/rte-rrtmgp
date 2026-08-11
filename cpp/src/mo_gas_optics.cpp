@@ -130,6 +130,7 @@ void GasOptics::compute_optical_properties(
     for (int igas = 0; igas < num_gas; ++igas) {
         try {
             auto vmr_2d = gas_concs.get_vmr(gas_names[igas]);
+            #pragma omp parallel for collapse(2)
             for (int col = 0; col < columns; ++col) {
                 for (int lay = 0; lay < layers; ++lay) {
                     col_gas_view(igas, lay, col) = vmr_2d(lay, col);

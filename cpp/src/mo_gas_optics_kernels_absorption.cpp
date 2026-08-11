@@ -10,22 +10,35 @@ inline void interpolate3D_byflav(
     int jtemp, int jpress, int gptS, int gptE,
     const ColMixView& col_mix, const FMajorView& fmajor, const KMajorView& kmajor,
     const JetaView& jeta, TauView& tau, int col, int lay, int iflav) {
-    
+
     int jeta1 = jeta(0, lay, col, iflav);
     int jeta2 = jeta(1, lay, col, iflav);
     real_t scaling1 = col_mix(0, lay, col, iflav);
     real_t scaling2 = col_mix(1, lay, col, iflav);
 
+    real_t f000 = fmajor(0, 0, 0, lay, col, iflav);
+    real_t f100 = fmajor(1, 0, 0, lay, col, iflav);
+    real_t f010 = fmajor(0, 1, 0, lay, col, iflav);
+    real_t f110 = fmajor(1, 1, 0, lay, col, iflav);
+
+    real_t f001 = fmajor(0, 0, 1, lay, col, iflav);
+    real_t f101 = fmajor(1, 0, 1, lay, col, iflav);
+    real_t f011 = fmajor(0, 1, 1, lay, col, iflav);
+    real_t f111 = fmajor(1, 1, 1, lay, col, iflav);
+
+    int jp_m1 = jpress - 1;
+
+    #pragma omp simd
     for (int igpt = gptS; igpt <= gptE; ++igpt) {
-        real_t t1 = fmajor(0, 0, 0, lay, col, iflav) * kmajor(igpt, jeta1, jpress - 1, jtemp) +
-                    fmajor(1, 0, 0, lay, col, iflav) * kmajor(igpt, jeta1 + 1, jpress - 1, jtemp) +
-                    fmajor(0, 1, 0, lay, col, iflav) * kmajor(igpt, jeta1, jpress, jtemp) +
-                    fmajor(1, 1, 0, lay, col, iflav) * kmajor(igpt, jeta1 + 1, jpress, jtemp);
-        
-        real_t t2 = fmajor(0, 0, 1, lay, col, iflav) * kmajor(igpt, jeta2, jpress - 1, jtemp + 1) +
-                    fmajor(1, 0, 1, lay, col, iflav) * kmajor(igpt, jeta2 + 1, jpress - 1, jtemp + 1) +
-                    fmajor(0, 1, 1, lay, col, iflav) * kmajor(igpt, jeta2, jpress, jtemp + 1) +
-                    fmajor(1, 1, 1, lay, col, iflav) * kmajor(igpt, jeta2 + 1, jpress, jtemp + 1);
+        real_t t1 = f000 * kmajor(igpt, jeta1, jp_m1, jtemp) +
+                    f100 * kmajor(igpt, jeta1 + 1, jp_m1, jtemp) +
+                    f010 * kmajor(igpt, jeta1, jpress, jtemp) +
+                    f110 * kmajor(igpt, jeta1 + 1, jpress, jtemp);
+
+        real_t t2 = f001 * kmajor(igpt, jeta2, jp_m1, jtemp + 1) +
+                    f101 * kmajor(igpt, jeta2 + 1, jp_m1, jtemp + 1) +
+                    f011 * kmajor(igpt, jeta2, jpress, jtemp + 1) +
+                    f111 * kmajor(igpt, jeta2 + 1, jpress, jtemp + 1);
 
         tau(igpt, lay, col) += scaling1 * t1 + scaling2 * t2;
     }
@@ -37,12 +50,21 @@ inline void interpolate2D_byflav(
     const FMinorView& fminor, const KMinorView& kminor,
     const JetaView& jeta, TauView& tau, int col, int lay, int iflav, real_t scaling) {
 
+    real_t fm00 = fminor(0, 0, lay, col, iflav);
+    real_t fm10 = fminor(1, 0, lay, col, iflav);
+    real_t fm01 = fminor(0, 1, lay, col, iflav);
+    real_t fm11 = fminor(1, 1, lay, col, iflav);
+
+    int jeta0 = jeta(0, lay, col, iflav);
+    int jeta1 = jeta(1, lay, col, iflav);
+
+    #pragma omp simd
     for (int igpt = gptS; igpt <= gptE; ++igpt) {
         int idx = kminor_start + (igpt - gptS);
-        real_t t = fminor(0, 0, lay, col, iflav) * kminor(idx, jeta(0, lay, col, iflav), jtemp) +
-                   fminor(1, 0, lay, col, iflav) * kminor(idx, jeta(0, lay, col, iflav) + 1, jtemp) +
-                   fminor(0, 1, lay, col, iflav) * kminor(idx, jeta(1, lay, col, iflav), jtemp + 1) +
-                   fminor(1, 1, lay, col, iflav) * kminor(idx, jeta(1, lay, col, iflav) + 1, jtemp + 1);
+        real_t t = fm00 * kminor(idx, jeta0, jtemp) +
+                   fm10 * kminor(idx, jeta0 + 1, jtemp) +
+                   fm01 * kminor(idx, jeta1, jtemp + 1) +
+                   fm11 * kminor(idx, jeta1 + 1, jtemp + 1);
         tau(igpt, lay, col) += scaling * t;
     }
 }
@@ -81,7 +103,7 @@ void gas_optical_depths_minor(
                         if (idx_scale >= 0) {
                             real_t vmr_fact = 1.0 / col_gas(0, lay, col);
                             real_t dry_fact = 1.0 / (1.0 + col_gas(idx_h2o - 1, lay, col) * vmr_fact);
-                            
+
                             if (scale_by_complement(imnr)) {
                                 scaling *= (1.0 - col_gas(idx_scale, lay, col) * vmr_fact * dry_fact);
                             } else {
@@ -234,7 +256,7 @@ void compute_tau_rayleigh(
             for (int col = 0; col < ncol; ++col) {
                 int itropo = tropo(lay, col) ? 0 : 1;
                 int iflav = gpoint_flavor(itropo, gptS) - 1;
-                
+
                 real_t scaling = col_gas(idx_h2o - 1, lay, col) + col_dry(lay, col);
 
                 // Inline interpolate2D_byflav specifically for krayl because krayl is [ngpt, neta, ntemp, 2]
@@ -286,7 +308,7 @@ void compute_Planck_source(
                                 fmajor(1, 0, 0, lay, col, iflav) * planck_frac(igpt, jeta1 + 1, jpress(lay, col) + itropo - 1, jtemp(lay, col)) +
                                 fmajor(0, 1, 0, lay, col, iflav) * planck_frac(igpt, jeta1, jpress(lay, col) + itropo, jtemp(lay, col)) +
                                 fmajor(1, 1, 0, lay, col, iflav) * planck_frac(igpt, jeta1 + 1, jpress(lay, col) + itropo, jtemp(lay, col));
-                    
+
                     real_t t2 = fmajor(0, 0, 1, lay, col, iflav) * planck_frac(igpt, jeta2, jpress(lay, col) + itropo - 1, jtemp(lay, col) + 1) +
                                 fmajor(1, 0, 1, lay, col, iflav) * planck_frac(igpt, jeta2 + 1, jpress(lay, col) + itropo - 1, jtemp(lay, col) + 1) +
                                 fmajor(0, 1, 1, lay, col, iflav) * planck_frac(igpt, jeta2, jpress(lay, col) + itropo, jtemp(lay, col) + 1) +

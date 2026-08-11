@@ -8,22 +8,14 @@ namespace rte::kernels {
 
 inline real_t fast_exp(real_t x) {
 #ifdef ENABLE_FAST_EXP
-    if (x < real_t(-87.0)) return real_t(0.0);
-    if (x > real_t(88.0))  return std::numeric_limits<real_t>::infinity();
+    if (x < real_t(-16.0)) return real_t(0.0);
+    if (x > real_t(0.0)) return std::exp(x);
 
-    constexpr real_t INV_LN2 = real_t(1.4426950408889634074);
-    constexpr real_t LN2     = real_t(0.6931471805599453094);
-
-    int k = static_cast<int>(x * INV_LN2 + (x < real_t(0.0) ? real_t(-0.5) : real_t(0.5)));
-    real_t r = x - static_cast<real_t>(k) * LN2;
-
-    real_t p = real_t(1.0) + r * (real_t(1.0) + r * (real_t(0.5) + r * (real_t(0.16666666666666667) + r * (real_t(0.041666666666666664) + r * real_t(0.008333333333333333)))));
-
-    uint64_t bits = static_cast<uint64_t>(static_cast<int64_t>(k) + 1023) << 52;
-    double twok;
-    std::memcpy(&twok, &bits, sizeof(double));
-
-    return p * twok;
+    real_t y = x * real_t(0.125);
+    real_t p = real_t(1.0) + y * (real_t(1.0) + y * (real_t(0.5) + y * (real_t(0.16666666666666667) + y * (real_t(0.041666666666666664) + y * real_t(0.008333333333333333)))));
+    p *= p; // p^2
+    p *= p; // p^4
+    return p * p; // p^8
 #else
     return std::exp(x);
 #endif
