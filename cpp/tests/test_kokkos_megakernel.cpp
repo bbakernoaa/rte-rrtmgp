@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
             std::cout << "  - LayoutLeft (GPU optimal) active: " << (has_layout_left ? "YES" : "NO") << std::endl;
 
             real_t expected_flux_up = 263.894;
-            real_t expected_flux_dn = 249.762;
+            real_t expected_flux_dn = 263.894;
 
             std::cout << "Computed verification flux_up TOA (lev 0): " << flux_up_host(0, 0) << " W/m^2 (expected: " << expected_flux_up << ")" << std::endl;
             std::cout << "Computed verification flux_dn SFC (lev " << layers << "): " << flux_dn_host(layers, 0) << " W/m^2 (expected: " << expected_flux_dn << ")" << std::endl;

@@ -94,8 +94,8 @@ void adding(
 ) {
     #pragma omp parallel for
     for (int col = 0; col < ncol; ++col) {
-        std::vector<real_t> albedo_data(nlay + 1, 0.0);
-        std::vector<real_t> src_data(nlay + 1, 0.0);
+        real_t albedo_data[257] = {0.0};
+        real_t src_data[257] = {0.0};
 
         albedo_data[nlay] = sfc_alb_dif(gp, col);
         src_data[nlay] = source_sfc(gp, col);

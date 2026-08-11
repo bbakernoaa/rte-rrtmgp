@@ -36,6 +36,7 @@ add_library(
   src/mo_gas_concentrations.cpp
   src/mo_gas_optics.cpp
   src/mo_gas_optics_kernels.cpp
+  src/mo_megakernel_cpp.cpp
   src/mo_rte_c_api.cpp
   src/mo_rte_extensions.cpp
   src/mo_rte_lw.cpp
@@ -80,6 +81,7 @@ add_rrtmgp_test(test_heating_rates)
 add_rrtmgp_test(test_gas_concentrations)
 add_rrtmgp_test(test_zenith_spherical)
 add_rrtmgp_test(test_cloud_sampling)
+add_rrtmgp_test(test_fused_cpp_megakernel)
 
 if(ENABLE_KOKKOS)
   add_rrtmgp_test(test_kokkos_megakernel)

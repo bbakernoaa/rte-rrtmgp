@@ -31,6 +31,10 @@ void KokkosMegakernel::execute_megakernel(
     (void)ssa_aerosol;
     (void)g_aerosol;
 
+    if (layers > 256) {
+        Kokkos::abort("KokkosMegakernel Error: layers exceed maximum stack buffer size (256)");
+    }
+
     const size_t tile_size = 16;
     const size_t num_tiles = (columns + tile_size - 1) / tile_size;
 
@@ -161,6 +165,7 @@ void KokkosMegakernel::execute_megakernel(
                             real_t fac = (t - 160.0) / 15.0;
                             int jp = static_cast<int>(fac);
                             if (jp < 0) jp = 0;
+                            if (jp > 8) jp = 8;
                             real_t fp = fac - static_cast<real_t>(jp);
                             lay_src[lay] = planck_ptr[gp * 10 + jp] * (1.0 - fp) + planck_ptr[gp * 10 + jp + 1] * fp;
                         } else {
@@ -176,6 +181,7 @@ void KokkosMegakernel::execute_megakernel(
                         real_t fac = (t_sfc_val - 160.0) / 15.0;
                         int jp = static_cast<int>(fac);
                         if (jp < 0) jp = 0;
+                        if (jp > 8) jp = 8;
                         real_t fp = fac - static_cast<real_t>(jp);
                         lev_src[layers] = planck_ptr[gp * 10 + jp] * (1.0 - fp) + planck_ptr[gp * 10 + jp + 1] * fp;
                     } else {
