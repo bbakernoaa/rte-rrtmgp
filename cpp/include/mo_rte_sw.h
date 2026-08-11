@@ -10,51 +10,23 @@ class SolverSw {
 public:
     static void solve_sw_noscat(
         ConstView3D tau,
-        ConstView1D solar_zenith_angle,
-        ConstView1D toa_flux,
-        View2D flux_dir
+        ConstView2D solar_zenith_angle, // [nlay, ncol]
+        ConstView2D inc_flux_dir,       // [ngpt, ncol]
+        View3D flux_dir                 // [ngpt, nlay+1, ncol]
     );
 
     static void solve_sw_2stream(
-        ConstView3D tau,
-        ConstView3D ssa,
-        ConstView3D g,
-        ConstView1D solar_zenith_angle,
-        ConstView2D sfc_albedo,
-        ConstView1D toa_flux,
-        View2D flux_up,
-        View2D flux_dn,
-        View2D flux_dir
+        ConstView3D tau,                // [ngpt, nlay, ncol]
+        ConstView3D ssa,                // [ngpt, nlay, ncol]
+        ConstView3D g,                  // [ngpt, nlay, ncol]
+        ConstView2D solar_zenith_angle, // [nlay, ncol]
+        ConstView2D sfc_alb_dir,        // [ngpt, ncol]
+        ConstView2D sfc_alb_dif,        // [ngpt, ncol]
+        ConstView2D inc_flux_dir,       // [ngpt, ncol]
+        View3D flux_up,                 // [ngpt, nlay+1, ncol]
+        View3D flux_dn,                 // [ngpt, nlay+1, ncol]
+        View3D flux_dir                 // [ngpt, nlay+1, ncol]
     );
 };
 
 } // namespace rte
-
-namespace rte::kernels {
-
-using namespace rrtmgp;
-
-void sw_dif_and_source(
-    ConstView3D tau,
-    ConstView3D ssa,
-    ConstView3D g,
-    ConstView1D mu0,
-    View3D R_dir,
-    View3D T_dir,
-    View3D R_dif,
-    View3D T_dif,
-    View3D source_up,
-    View3D source_dn
-);
-
-void adding_doubling(
-    ConstView3D R_dif,
-    ConstView3D T_dif,
-    ConstView3D source_up,
-    ConstView3D source_dn,
-    ConstView2D sfc_albedo,
-    View2D flux_up,
-    View2D flux_dn
-);
-
-} // namespace rte::kernels

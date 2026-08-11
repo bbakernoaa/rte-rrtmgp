@@ -11,7 +11,7 @@ int main() {
     std::vector<int> gpoint_to_band_data = {0, 0, 1, 1, 2}; // 5 gpoints, 3 bands
     std::vector<int> band_lims_data = {0, 2, 4,
                                        1, 3, 4}; // 2 rows, 3 bands
-    
+
     auto gpoint_to_band_view = IntView1D(gpoint_to_band_data.data(), Extents1D(5));
     auto band_lims_view = IntView2D(band_lims_data.data(), Extents2D(2, 3));
 

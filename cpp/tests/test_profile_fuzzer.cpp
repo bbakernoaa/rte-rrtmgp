@@ -202,7 +202,7 @@ int main() {
             if (prof.type == ProfileType::InvalidPressure || prof.type == ProfileType::InvalidTemperature) {
                 std::cout << "  - Executing error boundary verification..." << std::endl;
                 std::vector<real_t> flux_std(gpoints * columns, 0.0);
-                
+
                 // standard wrappers must throw on invalid variables
                 run_standard_solvers(layers, columns, gpoints, prof.play, prof.tlay, prof.clwp, prof.rel, flux_std);
 

@@ -25,7 +25,7 @@ void GasConcentrations::set_vmr(std::string_view gas_name, ConstView2D vmr_array
 
     // T005: Copy the input view values to a persistent backing memory buffer
     std::vector<real_t> data(vmr_array.data_handle(), vmr_array.data_handle() + vmr_array.size());
-    
+
     // Insert or overwrite the entry
     gas_storage_[key] = std::move(data);
 }

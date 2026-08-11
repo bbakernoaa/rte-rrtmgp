@@ -29,11 +29,19 @@ void run_standard_solvers(
     std::vector<real_t> lut_ice_data(gpoints * 2 * 2, 2.0);
     auto kmajor_std = ConstView4D(kmajor_data.data(), Extents4D(gpoints, 2, 2, 1));
     auto kminor_std = ConstView3D(kminor_data.data(), Extents3D(gpoints, 2, 1));
-    auto lut_liq_std = ConstView3D(lut_liquid_data.data(), Extents3D(gpoints, 2, 2));
-    auto lut_ice_std = ConstView3D(lut_ice_data.data(), Extents3D(gpoints, 2, 2));
+    auto lut_liq_std = ConstView2D(lut_liquid_data.data(), Extents2D(2, gpoints));
+    auto ssa_liq_std = ConstView2D(lut_liquid_data.data(), Extents2D(2, gpoints));
+    auto asy_liq_std = ConstView2D(lut_liquid_data.data(), Extents2D(2, gpoints));
+    auto lut_ice_std = ConstView3D(lut_ice_data.data(), Extents3D(2, gpoints, 2));
 
     GasOptics gas_optics_std(spectral_props, kmajor_std, kminor_std);
-    CloudOptics cloud_optics_std(spectral_props, lut_liq_std, lut_ice_std);
+    CloudOptics cloud_optics_std(
+        spectral_props,
+        0.0, 100.0, 1.0,
+        0.0, 100.0, 1.0,
+        lut_liq_std, ssa_liq_std, asy_liq_std,
+        lut_ice_std, lut_ice_std, lut_ice_std
+    );
 
     auto play_std = ConstView2D(play.data(), Extents2D(layers, columns));
     auto tlay_std = ConstView2D(tlay.data(), Extents2D(layers, columns));
@@ -41,9 +49,21 @@ void run_standard_solvers(
     auto rel_std = ConstView2D(rel.data(), Extents2D(layers, columns));
 
     // 1. Gas optics computation
+    GasConcentrations gas_concs(layers, columns);
     std::vector<real_t> tau_gas_std(gpoints * layers * columns, 0.0);
     auto tau_gas_view = View3D(tau_gas_std.data(), Extents3D(gpoints, layers, columns));
-    gas_optics_std.compute_optical_properties(play_std, tlay_std, tau_gas_view);
+
+    std::vector<real_t> plev_std_data((layers + 1) * columns, 1000.0);
+    std::vector<real_t> tsfc_std_data(columns, 300.0);
+    auto plev_std = ConstView2D(plev_std_data.data(), Extents2D(layers + 1, columns));
+    auto tsfc_std = ConstView1D(tsfc_std_data.data(), Extents1D(columns));
+
+    std::vector<real_t> tau_rayl_data(gpoints * layers * columns, 0.0);
+    std::vector<real_t> planck_src_data(gpoints * columns, 0.0);
+    auto tau_rayl_view = View3D(tau_rayl_data.data(), Extents3D(gpoints, layers, columns));
+    auto planck_src_view = View2D(planck_src_data.data(), Extents2D(gpoints, columns));
+
+    gas_optics_std.compute_optical_properties(play_std, plev_std, tlay_std, tsfc_std, gas_concs, tau_gas_view, tau_rayl_view, planck_src_view);
 
     // 2. Cloud parameterization computation
     std::vector<real_t> tau_cloud_std(gpoints * layers * columns, 0.0);

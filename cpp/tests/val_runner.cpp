@@ -17,7 +17,7 @@ int main() {
     std::vector<int> gpoint_to_band_data = {0, 0, 1, 1, 2, 2, 3, 3, 3, 3};
     std::vector<int> band_lims_data = {0, 2, 4, 6,
                                        1, 3, 5, 9};
-    
+
     auto gpt_view = IntView1D(gpoint_to_band_data.data(), Extents1D(10));
     auto blm_view = IntView2D(band_lims_data.data(), Extents2D(2, 4));
 
@@ -43,35 +43,57 @@ int main() {
     auto tlay_view = ConstView2D(tlay_data.data(), Extents2D(layers, columns));
 
     // 4. Compute optical depth tau
+    GasConcentrations gas_concs(layers, columns);
     std::vector<real_t> tau_data(10 * layers * columns, 0.0);
     auto tau_view = View3D(tau_data.data(), Extents3D(10, layers, columns));
 
-    optics.compute_optical_properties(play_view, tlay_view, tau_view);
+    std::vector<real_t> plev_data((layers + 1) * columns, 1000.0);
+    std::vector<real_t> tsfc_data(columns, 300.0);
+    auto plev_view = ConstView2D(plev_data.data(), Extents2D(layers + 1, columns));
+    auto tsfc_view = ConstView1D(tsfc_data.data(), Extents1D(columns));
+
+    std::vector<real_t> tau_rayl_data(10 * layers * columns, 0.0);
+    std::vector<real_t> planck_src_data(10 * columns, 0.0);
+    auto tau_rayl_view = View3D(tau_rayl_data.data(), Extents3D(10, layers, columns));
+    auto planck_src_view = View2D(planck_src_data.data(), Extents2D(10, columns));
+
+    optics.compute_optical_properties(play_view, plev_view, tlay_view, tsfc_view, gas_concs, tau_view, tau_rayl_view, planck_src_view);
 
     // 5. Setup Source Functions
     std::vector<real_t> lay_source_data(10 * layers * columns, 15.0);
     auto lay_source_view = ConstView3D(lay_source_data.data(), Extents3D(10, layers, columns));
 
     // Outputs
-    std::vector<real_t> flux_up_data(10 * columns, 0.0);
-    std::vector<real_t> flux_dn_data(10 * columns, 0.0);
+    std::vector<real_t> flux_up_data(10 * (layers + 1) * columns, 0.0);
+    std::vector<real_t> flux_dn_data(10 * (layers + 1) * columns, 0.0);
 
-    auto flux_up_view = View2D(flux_up_data.data(), Extents2D(10, columns));
-    auto flux_dn_view = View2D(flux_dn_data.data(), Extents2D(10, columns));
+    auto flux_up_view = View3D(flux_up_data.data(), Extents3D(10, layers + 1, columns));
+    auto flux_dn_view = View3D(flux_dn_data.data(), Extents3D(10, layers + 1, columns));
+
+    std::vector<real_t> lev_source_data(10 * (layers + 1) * columns, 10.0);
+    auto lev_source_view = ConstView3D(lev_source_data.data(), Extents3D(10, layers + 1, columns));
+    std::vector<real_t> sfc_emis_data(10 * columns, 1.0);
+    auto sfc_emis_view = ConstView2D(sfc_emis_data.data(), Extents2D(10, columns));
+    std::vector<real_t> incident_flux_data(10 * columns, 0.0);
+    auto incident_flux_view = ConstView2D(incident_flux_data.data(), Extents2D(10, columns));
 
     // 6. Solve fluxes (Longwave)
-    SolverLw::solve_lw_noscat(tau_view, lay_source_view, flux_up_view, flux_dn_view);
+    SolverLw::solve_lw_noscat(
+        tau_view, lay_source_view, lev_source_view,
+        sfc_emis_view, planck_src_view, incident_flux_view,
+        flux_up_view, flux_dn_view
+    );
 
     // 7. Solve fluxes (Shortwave)
-    std::vector<real_t> sza_data = {0.8}; // mu0
+    std::vector<real_t> sza_data_sw(layers * columns, 0.8); // mu0
     std::vector<real_t> toa_data(10, 120.0); // TOA flux
-    std::vector<real_t> flux_dir_data(10 * columns, 0.0);
+    std::vector<real_t> flux_dir_data(10 * (layers + 1) * columns, 0.0);
 
-    auto sza_view = ConstView1D(sza_data.data(), Extents1D(1));
+    auto sza_view_sw = ConstView2D(sza_data_sw.data(), Extents2D(layers, columns));
     auto toa_view = ConstView1D(toa_data.data(), Extents1D(10));
-    auto flux_dir_view = View2D(flux_dir_data.data(), Extents2D(10, columns));
+    auto flux_dir_view = View3D(flux_dir_data.data(), Extents3D(10, layers + 1, columns));
 
-    SolverSw::solve_sw_noscat(tau_view, sza_view, toa_view, flux_dir_view);
+    SolverSw::solve_sw_noscat(tau_view, sza_view_sw, incident_flux_view, flux_dir_view);
 
     // 8. Compute integrated layer heating rates using outputs (5 layers + 1 levels = 6 levels)
     std::vector<real_t> flux_up_levels(6 * columns, 200.0); // mock levels fluxes

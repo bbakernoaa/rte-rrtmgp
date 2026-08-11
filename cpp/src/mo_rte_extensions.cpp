@@ -93,7 +93,7 @@ void zenith_angle_spherical_correction(
         // Correct the zenith angle cosine factor near twilight (refraction / spherical curvature)
         real_t mu = std::cos(angle);
         real_t p_bottom = pressure_layers(0, col); // bottom level pressure
-        
+
         // Spherical correction adjustment formula
         real_t correction = 0.05 * (1.0 - p_bottom / 101325.0);
         corrected_zenith_angle(col) = std::min(1.0, std::max(0.01, mu + correction));
@@ -123,7 +123,7 @@ void execute_mcica_sampling(
             for (size_t lay = 0; lay < layers; ++lay) {
                 real_t c_frac = cloud_fraction(lay, col);
                 real_t r = distribution(generator);
-                
+
                 // If random draw is below layer cloud fraction, sub-column has a cloud
                 if (r <= c_frac) {
                     output_column_mask(lay, col * sub_columns_cnt + sub) = 1; // cloud

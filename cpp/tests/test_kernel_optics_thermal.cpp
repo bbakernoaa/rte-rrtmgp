@@ -11,7 +11,7 @@ int main() {
     std::cout << "Running test_kernel_optics_thermal..." << std::endl;
 
     const size_t gpoints = 2;
-    
+
     // Mock coefficients
     std::vector<real_t> krayleigh_data(gpoints * 2 * 1, 0.05); // 0.05 everywhere
     std::vector<real_t> planck_data(gpoints * 2 * 1, 15.0);
@@ -20,7 +20,7 @@ int main() {
     auto planck_fraction = ConstView3D(planck_data.data(), Extents3D(gpoints, 2, 1));
 
     InterpolationWeights weights;
-    weights.jtemp[0] = 0; 
+    weights.jtemp[0] = 0;
     weights.jtemp[1] = 1;
 
     std::vector<real_t> tau_rayleigh_data(gpoints, 0.0);

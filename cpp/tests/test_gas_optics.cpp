@@ -11,7 +11,7 @@ int main() {
     std::vector<int> gpoint_to_band_data = {0, 0, 1}; // 3 gpoints, 2 bands
     std::vector<int> band_lims_data = {0, 2,
                                        1, 2}; // 2 rows, 2 bands
-    
+
     auto gpoint_to_band_view = IntView1D(gpoint_to_band_data.data(), Extents1D(3));
     auto band_lims_view = IntView2D(band_lims_data.data(), Extents2D(2, 2));
 
@@ -19,7 +19,7 @@ int main() {
 
     // Mock coefficient data
     // kmajor dimensions: (gpoints=3, temp=2, press=2, species=1) -> 12 elements
-    std::vector<real_t> kmajor_data(12, 1.5); 
+    std::vector<real_t> kmajor_data(12, 1.5);
     // kminor dimensions: (gpoints=3, temp=2, species=1) -> 6 elements
     std::vector<real_t> kminor_data(6, 0.5);
 

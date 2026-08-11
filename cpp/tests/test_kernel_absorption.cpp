@@ -11,7 +11,7 @@ int main() {
     std::cout << "Running test_kernel_absorption..." << std::endl;
 
     const size_t gpoints = 2;
-    
+
     // Mock coefficients
     std::vector<real_t> kmajor_data(gpoints * 2 * 2 * 1, 2.0); // 2.0 everywhere
     std::vector<real_t> kminor_data(gpoints * 2 * 1, 0.5);

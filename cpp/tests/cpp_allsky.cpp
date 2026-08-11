@@ -182,20 +182,36 @@ int main() {
 
         GasOptics optics(spectral_props, kmajor, kminor);
 
+        GasConcentrations gas_concs(layers, columns);
+
         std::vector<real_t> tau_gas_data(gpoints * layers * columns, 0.0);
         auto tau_gas = View3D(tau_gas_data.data(), Extents3D(gpoints, layers, columns));
-        optics.compute_optical_properties(play, tlay, tau_gas);
+
+        std::vector<real_t> plev_data((layers + 1) * columns, 1000.0);
+        std::vector<real_t> tsfc_data(columns, 300.0);
+        auto plev = ConstView2D(plev_data.data(), Extents2D(layers + 1, columns));
+        auto tsfc = ConstView1D(tsfc_data.data(), Extents1D(columns));
+
+        std::vector<real_t> tau_rayl_data(gpoints * layers * columns, 0.0);
+        std::vector<real_t> planck_src_data(gpoints * columns, 0.0);
+        auto tau_rayl = View3D(tau_rayl_data.data(), Extents3D(gpoints, layers, columns));
+        auto planck_src = View2D(planck_src_data.data(), Extents2D(gpoints, columns));
+
+        optics.compute_optical_properties(play, plev, tlay, tsfc, gas_concs, tau_gas, tau_rayl, planck_src);
 
         // CloudOptics
-        std::vector<real_t> lut_liquid_data = {
-            5.0, 0.95, 5.0, 0.95,
-            5.0, 0.95, 5.0, 0.95
-        };
-        std::vector<real_t> lut_ice_data(gpoints * 2 * 2, 2.0);
-        auto lut_liq = ConstView3D(lut_liquid_data.data(), Extents3D(gpoints, 2, 2));
-        auto lut_ice = ConstView3D(lut_ice_data.data(), Extents3D(gpoints, 2, 2));
+        std::vector<real_t> lut_liquid_data(2 * 2, 5.0);
+        std::vector<real_t> lut_ice_data(2 * 2 * 2, 2.0);
+        auto lut_liq = ConstView2D(lut_liquid_data.data(), Extents2D(2, 2));
+        auto lut_ice = ConstView3D(lut_ice_data.data(), Extents3D(2, 2, 2));
 
-        CloudOptics cloud_parameterization(spectral_props, lut_liq, lut_ice);
+        CloudOptics cloud_parameterization(
+            spectral_props,
+            0.0, 100.0, 1.0,
+            0.0, 100.0, 1.0,
+            lut_liq, lut_liq, lut_liq,
+            lut_ice, lut_ice, lut_ice
+        );
 
         std::vector<real_t> tau_cloud_data(gpoints * layers * columns, 0.0);
         std::vector<real_t> ssa_cloud_data(gpoints * layers * columns, 0.0);
@@ -228,23 +244,29 @@ int main() {
         std::vector<real_t> sfc_albedo_data(gpoints * columns, 0.1);
         auto sfc_albedo_view = ConstView2D(sfc_albedo_data.data(), Extents2D(gpoints, columns));
 
-        std::vector<real_t> flux_up_data(gpoints * columns, 0.0);
-        std::vector<real_t> flux_dn_data(gpoints * columns, 0.0);
-        std::vector<real_t> flux_dir_data(gpoints * columns, 0.0);
+        std::vector<real_t> flux_up_data(gpoints * (layers + 1) * columns, 0.0);
+        std::vector<real_t> flux_dn_data(gpoints * (layers + 1) * columns, 0.0);
+        std::vector<real_t> flux_dir_data(gpoints * (layers + 1) * columns, 0.0);
 
-        auto flux_up = View2D(flux_up_data.data(), Extents2D(gpoints, columns));
-        auto flux_dn = View2D(flux_dn_data.data(), Extents2D(gpoints, columns));
-        auto flux_dir = View2D(flux_dir_data.data(), Extents2D(gpoints, columns));
+        auto flux_up = View3D(flux_up_data.data(), Extents3D(gpoints, layers + 1, columns));
+        auto flux_dn = View3D(flux_dn_data.data(), Extents3D(gpoints, layers + 1, columns));
+        auto flux_dir = View3D(flux_dir_data.data(), Extents3D(gpoints, layers + 1, columns));
+
+        std::vector<real_t> sza_data_2d(layers * columns, 0.8);
+        auto sza_view_2d = ConstView2D(sza_data_2d.data(), Extents2D(layers, columns));
+
+        std::vector<real_t> toa_flux_data_2d(gpoints * columns, 120.0);
+        auto toa_view_2d = ConstView2D(toa_flux_data_2d.data(), Extents2D(gpoints, columns));
 
         // Solve shortwave solar beam transfers
         SolverSw::solve_sw_2stream(
-            tau_total, ssa_cloud, g_cloud, sza_view, sfc_albedo_view, toa_view,
+            tau_total, ssa_cloud, g_cloud, sza_view_2d, sfc_albedo_view, sfc_albedo_view, toa_view_2d,
             flux_up, flux_dn, flux_dir
         );
 
         // T013: Run end-to-end cpp_allsky validation and assert correctness
-        std::cout << "Direct Beam Surface Flux gp0: " << flux_dir(0, 0) << std::endl;
-        
+        std::cout << "Direct Beam Surface Flux gp0: " << flux_dir(0, 0, 0) << std::endl;
+
         // Expected direct beam attenuation = toa_flux * mu0 * exp(-tau_total / mu0)
         // mu0 = 0.8.
         // Gas optics computed tau_gas = base_k (2.5) * play(lay=0, 1000hPa) * tlay(lay=0, 290) * 1e-6 = 2.5 * 1000 * 290 * 1e-6 = 0.725
@@ -252,7 +274,7 @@ int main() {
         // Cloud depth = clwp (0.2) * 5.0 * 5 layers = 5.0.
         // Total tau = 7.3865.
         // Expected attenuated direct flux = 120.0 * 0.8 * exp(-7.3865 / 0.8) = 96.0 * exp(-9.233) = 0.009
-        if (flux_dir(0, 0) <= 0.0 || flux_dir(0, 0) >= 0.1) {
+        if (flux_dir(0, layers, 0) <= 0.0 || flux_dir(0, layers, 0) >= 0.1) {
             std::cerr << "test_allsky FAIL: Mismatched end-to-end direct solar beam fluxes!" << std::endl;
             return 1;
         }

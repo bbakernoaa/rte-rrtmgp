@@ -32,7 +32,7 @@ int main() {
     try {
         registry.set_vmr("CO2", vmr_view);
         auto retrieved = registry.get_vmr("CO2");
-        
+
         // Verify dimensions and values safely without assert()
         if (retrieved.extent(0) != layers || retrieved.extent(1) != columns) {
             std::cerr << "test_gas_concentrations FAIL: Retrived dimensions mismatched layers/columns grid" << std::endl;

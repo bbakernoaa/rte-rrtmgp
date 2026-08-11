@@ -29,20 +29,26 @@ int main() {
     auto sza_view = ConstView1D(sza_data.data(), Extents1D(columns));
     auto toa_view = ConstView1D(toa_data.data(), Extents1D(gpoints));
 
-    // Outputs: View2D (gpoints, columns)
-    std::vector<real_t> flux_dir_data(gpoints * columns, 0.0); 
-    auto flux_dir_view = View2D(flux_dir_data.data(), Extents2D(gpoints, columns));
+    std::vector<real_t> sza_data_2d(layers * columns, 0.8);
+    auto sza_view_2d = ConstView2D(sza_data_2d.data(), Extents2D(layers, columns));
+
+    std::vector<real_t> toa_flux_data_2d(gpoints * columns, 100.0);
+    auto toa_view_2d = ConstView2D(toa_flux_data_2d.data(), Extents2D(gpoints, columns));
+
+    // Outputs: View3D (gpoints, layers+1, columns)
+    std::vector<real_t> flux_dir_data(gpoints * (layers + 1) * columns, 0.0);
+    auto flux_dir_view_3d = View3D(flux_dir_data.data(), Extents3D(gpoints, layers + 1, columns));
 
     try {
-        SolverSw::solve_sw_noscat(tau_view, sza_view, toa_view, flux_dir_view);
+        SolverSw::solve_sw_noscat(tau_view, sza_view_2d, toa_view_2d, flux_dir_view_3d);
 
         // For gp=0, lay=0 has tau=0.5, lay=1 has tau=0.2. Total tau = 0.7.
         real_t expected_dir_gp0 = 100.0 * 0.8 * std::exp(-(0.5 + 0.2) / 0.8);
-        
-        std::cout << "Actual flux_dir: " << std::setprecision(10) << flux_dir_view(0, 0) << std::endl;
+
+        std::cout << "Actual flux_dir: " << std::setprecision(10) << flux_dir_view_3d(0, layers, 0) << std::endl;
         std::cout << "Expected flux_dir: " << std::setprecision(10) << expected_dir_gp0 << std::endl;
 
-        if (std::abs(flux_dir_view(0, 0) - expected_dir_gp0) >= 1e-5) {
+        if (std::abs(flux_dir_view_3d(0, layers, 0) - expected_dir_gp0) >= 1e-5) {
             std::cerr << "test_solver_sw FAIL: Mismatched non-scattering flux values" << std::endl;
             return 1;
         }
@@ -68,23 +74,26 @@ int main() {
     auto sfc_albedo_view = ConstView2D(sfc_albedo_data.data(), Extents2D(gpoints, columns));
 
     // Outputs
-    std::vector<real_t> flux_up_data(gpoints * columns, 0.0);
-    std::vector<real_t> flux_dn_data(gpoints * columns, 0.0);
+    std::vector<real_t> flux_up_data(gpoints * (layers + 1) * columns, 0.0);
+    std::vector<real_t> flux_dn_data(gpoints * (layers + 1) * columns, 0.0);
 
-    auto flux_up_view = View2D(flux_up_data.data(), Extents2D(gpoints, columns));
-    auto flux_dn_view = View2D(flux_dn_data.data(), Extents2D(gpoints, columns));
+    auto flux_up_view = View3D(flux_up_data.data(), Extents3D(gpoints, layers + 1, columns));
+    auto flux_dn_view = View3D(flux_dn_data.data(), Extents3D(gpoints, layers + 1, columns));
+
+    std::vector<real_t> sfc_alb_dir_data(gpoints * columns, 0.2);
+    auto sfc_alb_dir_view = ConstView2D(sfc_alb_dir_data.data(), Extents2D(gpoints, columns));
 
     try {
         SolverSw::solve_sw_2stream(
-            tau_view, ssa_view, g_view, sza_view, sfc_albedo_view, toa_view,
-            flux_up_view, flux_dn_view, flux_dir_view
+            tau_view, ssa_view, g_view, sza_view_2d, sfc_alb_dir_view, sfc_albedo_view, toa_view_2d,
+            flux_up_view, flux_dn_view, flux_dir_view_3d
         );
 
-        std::cout << "Actual flux_dn: " << flux_dn_view(0, 0) << std::endl;
-        std::cout << "Actual flux_up: " << flux_up_view(0, 0) << std::endl;
+        std::cout << "Actual flux_dn: " << flux_dn_view(0, 0, 0) << std::endl;
+        std::cout << "Actual flux_up: " << flux_up_view(0, 0, 0) << std::endl;
 
         // Verification checks (for green phase)
-        if (flux_up_view(0, 0) <= 0.0 || flux_dn_view(0, 0) <= 0.0) {
+        if (flux_up_view(0, 0, 0) <= 0.0 || flux_dn_view(0, 0, 0) <= 0.0) {
             std::cerr << "test_solver_sw FAIL: Mismatched scattering fluxes" << std::endl;
             return 1;
         }

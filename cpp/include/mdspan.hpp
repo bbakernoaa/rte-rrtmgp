@@ -4185,7 +4185,7 @@ private:
   MDSPAN_FORCE_INLINE_FUNCTION constexpr mapping_type const& mapping_ref() const noexcept { return m_members.second().first(); }
   MDSPAN_FORCE_INLINE_FUNCTION MDSPAN_IMPL_CONSTEXPR_14 accessor_type& accessor_ref() noexcept { return m_members.second().second(); }
   MDSPAN_FORCE_INLINE_FUNCTION constexpr accessor_type const& accessor_ref() const noexcept { return m_members.second().second(); }
-  
+
   MDSPAN_TEMPLATE_REQUIRES(
     class SizeType,
     /* requires */ (
@@ -7953,4 +7953,3 @@ private:
 //END_FILE_INCLUDE: /home/runner/work/mdspan/mdspan/include/mdspan/mdarray.hpp
 //END_FILE_INCLUDE: /home/runner/work/mdspan/mdspan/include/experimental/mdarray
 #endif // MDSPAN_SINGLE_HEADER_INCLUDE_GUARD_
-

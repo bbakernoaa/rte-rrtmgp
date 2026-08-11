@@ -28,7 +28,7 @@ int main() {
         // pressure 500.0 is index 1
         // temp 240.0 is exactly mid-point of index 1 lay (280.0 down to 200.0) -> offset 0.5
         interpolation(ref_press, ref_temp, 500.0, 240.0, weights);
-        
+
         assert(weights.jpress[0] == 1);
         assert(weights.jtemp[0] == 0); // Bottom boundary of interpolation cell
 
